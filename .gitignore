@@ -4,3 +4,6 @@ __pycache__/
 
 # Generated STEP/STL files; rebuild with the model script
 out/
+
+# Bambu Studio command-line logs
+*.log
