@@ -521,6 +521,18 @@ def on_bed(part):
     return part.translate((0, 0, -part.val().BoundingBox().zmin))
 
 
+def colour_bands(part, cuts):
+    """Slice a part standing on the bed into horizontal bands at `cuts`."""
+    edges = [-1.0] + list(cuts) + [1000.0]
+    return [part.intersect(box(-500, 500, -500, 500, lo, hi)) for lo, hi in zip(edges, edges[1:])]
+
+
+def colour_cuts(p=P):
+    """Heights above the bed where a part changes colour: the dial's raised
+    letters start at its top face."""
+    return {"dial": [p.dial_t]}
+
+
 def main(out=Path(__file__).parent / "out"):
     out.mkdir(exist_ok=True)
     base, lid, door, dial = make_base(), make_lid(), make_door(), make_dial()
@@ -540,6 +552,10 @@ def main(out=Path(__file__).parent / "out"):
         part = on_bed(part)
         cq.exporters.export(part, str(out / f"{name}.step"))
         cq.exporters.export(part, str(out / f"{name}.stl"), tolerance=0.01, angularTolerance=0.1)
+        # The same part in bands, left in place, for printing in more than one colour
+        if name in colour_cuts():
+            for i, band in enumerate(colour_bands(part, colour_cuts()[name])):
+                cq.exporters.export(band, str(out / f"{name}.band{i}.stl"), tolerance=0.01, angularTolerance=0.1)
         bb = part.val().BoundingBox()
         print(f"{name:14s} {bb.xlen:6.1f} x {bb.ylen:6.1f} x {bb.zlen:5.1f} mm")
 
