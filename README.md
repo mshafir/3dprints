@@ -14,6 +14,7 @@ layers and no supports.
 |---|---|---|
 | [`pill-case/`](pill-case/) | Round four-week pill case with a click dial and a sliding door | Printed and revised several times |
 | [`sink-organizer/`](sink-organizer/) | Bathroom sink organizer: a 1 inch grid baseplate with snap-in modules for toothbrushes, toothpaste, an electric toothbrush charger and bar soap | Snap latches redesigned after the first test prints; the new latches are not yet printed |
+| [`frame/`](frame/) | Picture frame for an 11 x 8.5 in glass, picture and easel backing: a slim cut-through lattice border in two halves joined by sliding dovetails, with snap tabs that hold the backing and keyholes for hanging | Designed; not yet printed |
 
 ## Layout
 
