@@ -30,28 +30,35 @@ Every project folder has the same shape:
   out/                generated STEP, STL and 3MF files (not in git)
 ```
 
-At the repo root, `requirements.txt` pins CadQuery and pytest, and one `.venv`
-is shared by all projects.
+At the repo root, `pyproject.toml` pins CadQuery and pytest, `uv.lock` records
+the exact versions of everything they pull in, and one `.venv` is shared by
+all projects.
 
 ## Setup
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it,
+then from the repo root:
+
 ```
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+uv sync
 ```
 
-`make_3mf.py` also needs Bambu Studio installed as a flatpak
-(`com.bambulab.BambuStudio`; written against 2.8.2). The models and tests do
-not.
+This creates `.venv` with Python 3.12 (uv downloads it if needed) and installs
+the locked dependencies. `uv run` also does this on first use, so the step is
+optional.
+
+`make_3mf.py` also needs Bambu Studio (written against 2.8.2): the flatpak
+(`com.bambulab.BambuStudio`) on Linux, or the app in `/Applications` on macOS.
+The models and tests do not need Studio.
 
 ## Building a project
 
 Run these from inside the project folder, for example `sink-organizer/`:
 
 ```
-../.venv/bin/python sink_organizer.py     # write STEP and STL files to out/
-../.venv/bin/python -m pytest tests -q    # check the geometry
-../.venv/bin/python make_3mf.py           # write out/sink_organizer.3mf
+uv run sink_organizer.py     # write STEP and STL files to out/
+uv run pytest tests -q       # check the geometry
+uv run make_3mf.py           # write out/sink_organizer.3mf
 ```
 
 Open the `.3mf` in Bambu Studio to print. It has one plate per group of parts,

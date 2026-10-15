@@ -1,6 +1,6 @@
 """Four-week click-dial pill case for a 0.4 mm nozzle FDM printer.
 
-Run `../.venv/bin/python pill_case.py` from this folder to write STEP and STL files to out/.
+Run `uv run pill_case.py` from this folder to write STEP and STL files to out/.
 All parts are modelled assembled, z up, which is also their print orientation.
 Angles are degrees, anticlockwise seen from above; pocket 0 (week 1 Sunday) is
 at +Y and the days run clockwise.

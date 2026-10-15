@@ -1,6 +1,6 @@
 """Gridfinity-style sink-top organizer on a 1 inch grid: baseplate and modules.
 
-Run `../.venv/bin/python sink_organizer.py` from this folder to write STEP and
+Run `uv run sink_organizer.py` from this folder to write STEP and
 STL files to out/.
 
 Every part is modelled z up, which is also its print orientation, centred on

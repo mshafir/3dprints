@@ -1,7 +1,7 @@
 """Bundle the exported STLs into one Bambu Studio project (.3mf) with the print
 settings and colours already chosen.
 
-Run `../.venv/bin/python make_3mf.py` from this folder after
+Run `uv run make_3mf.py` from this folder after
 `sink_organizer.py` has written out/. It drives the Bambu Studio flatpak from
 the command line, so the project is written by Studio itself, as
 out/sink_organizer.3mf: one plate per group of parts, in two filaments.
@@ -16,7 +16,11 @@ import zipfile
 from pathlib import Path
 
 APP = "com.bambulab.BambuStudio"
-PRESETS = Path.home() / ".var/app" / APP / "config/BambuStudio/system/BBL"
+MAC_APP = Path("/Applications/BambuStudio.app/Contents/MacOS/BambuStudio")
+if sys.platform == "darwin":
+    PRESETS = Path.home() / "Library/Application Support/BambuStudio/system/BBL"
+else:
+    PRESETS = Path.home() / ".var/app" / APP / "config/BambuStudio/system/BBL"
 
 MACHINE = "Bambu Lab P1S 0.4 nozzle"
 FILAMENT = "Bambu PLA Basic @BBL P1S 0.4 nozzle"
@@ -119,12 +123,23 @@ def main(out=Path(__file__).parent / "out"):
         tmp = Path(tmp)
         presets = write_presets(tmp)
         (tmp / "assemble.json").write_text(json.dumps(assemble_list(out), indent=1))
-        cmd = ["flatpak", "run", f"--filesystem={out}", "--command=bambu-studio", APP]
+        if sys.platform == "darwin":
+            cmd = [str(MAC_APP)]
+        else:
+            cmd = ["flatpak", "run", f"--filesystem={out}", "--command=bambu-studio", APP]
         cmd += ["--load-settings", f"{presets['machine']};{presets['process']}"]
         cmd += ["--load-filaments", ";".join(str(f) for f in presets["filaments"])]
         cmd += ["--load-assemble-list", str(tmp / "assemble.json")]
-        cmd += ["--orient", "0", "--export-3mf", str(target)]
+        cmd += ["--orient", "0"]
+        if sys.platform == "darwin":
+            # The Mac build does not write result.json to the working folder
+            # unless told to, and then exports relative to that folder
+            cmd += ["--outputdir", str(tmp), "--export-3mf", target.name]
+        else:
+            cmd += ["--export-3mf", str(target)]
         run = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True)
+        if (tmp / target.name).exists():
+            (tmp / target.name).replace(target)
         result = json.loads((tmp / "result.json").read_text()) if (tmp / "result.json").exists() else {"return_code": -1, "error_string": "no result"}
         if result["return_code"] != 0:
             sys.exit(f"{result['error_string']}\n{(run.stdout + run.stderr)[-3000:]}")
