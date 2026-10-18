@@ -1,3 +1,4 @@
+import math
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -38,9 +39,28 @@ def halves(body):
 
 
 @pytest.fixture(scope="module")
-def parts(halves):
-    out = dict(zip(fr.section_names(), halves))
-    out.update(fr.fit_test_parts(parts=halves))
+def btn():
+    """Without its detent finger, whose nub presses on the pocket wall by
+    design; the detent has its own tests."""
+    return fr.button(finger=False)
+
+
+@pytest.fixture(scope="module")
+def btn_det():
+    return fr.button()
+
+
+@pytest.fixture(scope="module")
+def supported(body):
+    return fr.make_sections(body=body, support=True)
+
+
+@pytest.fixture(scope="module")
+def parts(supported):
+    """Every printed part, turned as it prints, the halves with their lip support."""
+    out = {n: fr.face_up(h) for n, h in zip(fr.section_names(), supported)}
+    out.update({n: fr.face_up(t) for n, t in fr.fit_test_parts(parts=supported).items()})
+    out["button"] = fr.button_print()
     return out
 
 
@@ -59,8 +79,9 @@ def test_parts_are_single_valid_solids(parts):
 
 
 def test_no_unsupported_overhangs(parts):
+    allow = [fr.face_up(z) for z in fr.bridge_zones()]
     for name, part in parts.items():
-        assert fr.overhang_area(part) < 0.5, name
+        assert fr.overhang_area(part, allow=allow) < 0.5, name
 
 
 def test_parts_fit_the_bed(parts):
@@ -73,9 +94,41 @@ def zmin(part):
     return min(v.Z for v in part.vertices().vals())
 
 
-def test_front_is_flat_on_the_bed(halves):
-    for half in halves:
-        assert zmin(half) == pytest.approx(0, abs=1e-6)
+def test_halves_print_face_up(parts):
+    """Turned to print, the back is on the bed and the solid front is the top."""
+    w, h = fr.outer()
+    sw, sh = fr.sight()
+    ring = (w * h - (4 - math.pi) * P.corner_r**2 - sw * sh) * 0.4
+    for name in fr.section_names():
+        part = parts[name]
+        assert zmin(part) == pytest.approx(0, abs=1e-6), name
+        top = fr.box(-w, w, -h, h, P.depth - P.chamfer - 0.5, P.depth - P.chamfer - 0.1)
+        assert overlap(part, top) == pytest.approx(ring / 2, rel=0.02), name
+
+
+def test_pegs_start_on_the_bed(body):
+    """Each peg's head is flush with the back, so face up it prints from the bed."""
+    for deg, yr, c in fr.locks():
+        dot = fr.turn(fr.cyl(0.5, P.depth - 0.1, P.depth, c + fr.btn_x(), yr + P.btn_pivot), deg)
+        assert overlap(body, dot) == pytest.approx(math.pi * 0.25 * 0.1, rel=0.02), (deg, c)
+
+
+def test_lip_is_supported_while_printing(body):
+    """A wall one line thick under the lip stops just short of it, inside the
+    opening's edge, and touches the frame only by the tabs at its foot."""
+    wall = fr.lip_support()
+    tabs = wall.intersect(fr.box(-500, 500, -500, 500, P.depth - P.tab_h, P.depth))
+    assert overlap(wall, body) < tabs.val().Volume() * 0.05  # the tabs' 0.01 mm into the rabbet wall
+    assert overlap(moved(wall, z=-(P.sup_gap + 0.05)), body) > EPS  # raised by the gap, it meets the lip
+    assert overlap(wall, contents()) > EPS  # it stands where the contents go: peeled off first
+
+
+def test_lip_bridge_is_short():
+    assert P.lip + P.clr - P.sup_in - P.sup_w <= 4.5
+
+
+def test_bridges_are_short():
+    assert fr.pocket_r() - P.peg_r <= 8.5  # pocket floor, peg to wall
 
 
 # --- Size and contents --------------------------------------------------------
@@ -86,54 +139,110 @@ def test_frame_is_cut_in_two(halves):
 
 
 def test_opening_and_outside(body):
-    assert fr.sight() == pytest.approx((272.4, 208.9))
+    assert fr.sight() == pytest.approx((270.4, 206.9))
     x, y, z = size(body)
     assert (x, y, z) == pytest.approx((312.4, 248.9, P.depth), abs=0.01)
 
 
 def test_contents_fit_with_clearance(body):
-    """The stack fits centred. Off-centre it fits as far back as the ridges,
-    whose slopes then centre the backing."""
     assert overlap(body, contents()) < EPS
-    front = fr.box(-P.content_w / 2, P.content_w / 2, -P.content_h / 2, P.content_h / 2, P.skin, fr.ridge_z())
     for dx, dy in ((P.clr - 0.05, 0), (0, P.clr - 0.05)):
-        assert overlap(body, moved(front, dx, dy)) < EPS
+        assert overlap(body, moved(contents(), dx, dy)) < EPS
     for dx, dy in ((P.clr + 0.1, 0), (0, P.clr + 0.1)):
-        assert overlap(body, moved(front, dx, dy)) > EPS
+        assert overlap(body, moved(contents(), dx, dy)) > EPS
 
 
 def test_lip_stops_the_contents_at_the_front(body):
     assert overlap(body, moved(contents(), z=-0.1)) > EPS
 
 
-def test_tabs_hold_the_contents_in(body):
-    """Pushed back by more than the slack, the backing meets every ridge,
-    even when it has slid to one side by the full clearance."""
-    stack = contents()
-    for dx, dy in ((0, 0), (P.clr, 0), (-P.clr, 0), (0, P.clr), (0, -P.clr)):
-        assert overlap(body, moved(stack, dx, dy, P.slack + 0.1)) > EPS
+def test_front_is_solid(body):
+    """From the front the border is solid all the way round."""
+    w, h = fr.outer()
+    sw, sh = fr.sight()
+    ring = (w * h - (4 - math.pi) * P.corner_r**2 - sw * sh) * 0.4
+    slab = fr.box(-w, w, -h, h, P.chamfer + 0.1, P.chamfer + 0.5)
+    assert overlap(body, slab) == pytest.approx(ring, rel=1e-3)
 
 
-def test_six_tabs_with_ridges_behind_the_stack(body):
+def test_sides_are_solid(body):
+    """No lattice: just in front of the back, the border is solid but for the
+    button pockets and keyholes."""
+    w, h = fr.outer()
     rw, rh = fr.rabbet()
-    found = 0
-    for side, deg, yr, _ in fr.sides():
-        for c, has_tab in fr.pads(side):
-            if not has_tab:
-                continue
-            found += 1
-            z = fr.ridge_z() + P.tab_proud
-            probe = fr.turn(fr.box(c - 1, c + 1, yr - P.tab_proud + 0.1, yr - 0.1, z, z + 0.2), deg)
-            assert overlap(body, probe) == pytest.approx(probe.val().Volume(), rel=1e-3), side
-            gap = fr.turn(fr.box(c - 1, c + 1, yr + P.tab_t + 0.1, yr + P.tab_t + fr.tab_back() - 0.1, P.skin + 0.1, P.depth - 0.1), deg)
-            assert overlap(body, gap) < EPS, side  # room behind the leaf to bend
-    assert found == 6
+    border = (w * h - (4 - math.pi) * P.corner_r**2 - rw * rh) * 0.4
+    got = overlap(body, fr.box(-w, w, -h, h, P.depth - 0.5, P.depth - 0.1))
+    assert 0.85 * border < got < border
 
 
-def test_leaf_bending_strain_is_moderate():
-    """Cantilever strain at full deflection: 3 t d / (2 L^2)."""
-    length = fr.ridge_z() + P.tab_proud - P.skin
-    assert 3 * P.tab_t * P.tab_proud / (2 * length**2) < 0.017
+def test_six_buttons_hold_the_contents_in(body, btn):
+    """Every closed button sits clear of the frame and the contents, and stops
+    the backing moving back, even when it has slid away by the full clearance."""
+    assert len(fr.locks()) == 6
+    for deg, yr, c in fr.locks():
+        b = fr.button_at(deg, yr, c, part=btn)
+        assert overlap(body, b) < EPS and overlap(contents(), b) < EPS
+        for dx, dy in ((0, 0), (P.clr, 0), (-P.clr, 0), (0, P.clr), (0, -P.clr)):
+            assert overlap(b, moved(contents(), dx, dy, 0.1)) > EPS, (deg, c, dx, dy)
+
+
+def test_buttons_turn_clear_of_the_frame(body, btn):
+    for deg, yr, c in fr.locks():
+        for theta in (30, 60, 90, 120, 150, 180):
+            assert overlap(body, fr.button_at(deg, yr, c, theta, part=btn)) < EPS, (deg, c, theta)
+        open_ = fr.button_at(deg, yr, c, 90, part=btn)
+        assert overlap(open_, moved(contents(), z=1)) < EPS  # open, the contents lift out
+
+
+def test_buttons_stay_on_while_in_use(body, btn):
+    """From closed to open the peg's head stops a button lifting off, and the
+    pocket wall stops it sliding back far enough for its hole to pass over
+    the head."""
+    assert fr.pocket_r() - fr.btn_tail() < P.btn_off - 0.5
+    for deg, yr, c in fr.locks():
+        for theta in (0, 45, 90):
+            b = fr.button_at(deg, yr, c, theta, part=btn)
+            assert overlap(body, moved(b, z=0.5)) > EPS, (deg, c, theta)
+            a = math.radians(theta + deg)
+            back = (-math.sin(a) * P.btn_off, math.cos(a) * P.btn_off)
+            assert overlap(body, moved(b, *back)) > EPS, (deg, c, theta)
+
+
+def test_buttons_come_off_turned_outwards(body, btn):
+    for deg, yr, c in fr.locks():
+        a = math.radians(deg)
+        for s in (1.0, 2.0, 3.0, P.btn_off):
+            b = moved(fr.button_at(deg, yr, c, 180, part=btn), math.sin(a) * s, -math.cos(a) * s)
+            assert overlap(body, b) < EPS, (deg, c, s)
+        assert overlap(body, moved(b, z=P.depth)) < EPS
+
+
+def test_buttons_click_into_closed_and_open(body, btn_det):
+    """The nub sits in a notch at closed and open, and presses on the pocket
+    wall in between, so the button stays where it is turned."""
+    for deg, yr, c in fr.locks():
+        for theta in (0, 90):
+            assert overlap(body, fr.button_at(deg, yr, c, theta, part=btn_det)) < EPS, (deg, c, theta)
+        for theta in (20, 45, 70):
+            assert overlap(body, fr.button_at(deg, yr, c, theta, part=btn_det)) > EPS, (deg, c, theta)
+
+
+def test_detent_finger_strain_is_low():
+    """Cantilever strain 3 t d / (2 L^2): turning, the nub is pushed in by
+    det_press; taking the button off pushes it in further where the pocket
+    wall meets the rabbet. PLA yields at about 2.5%."""
+    L = fr.det_len()
+    assert 3 * P.det_w * P.det_press / (2 * L**2) < 0.01
+    off = fr.pocket_r() + P.det_press - math.sqrt(fr.pocket_r() ** 2 - P.btn_pivot**2)
+    assert 3 * P.det_w * off / (2 * L**2) < 0.02
+
+
+def test_detent_finger_is_taller_than_the_bar():
+    """Force goes with the finger's height, strain does not: 4 mm against the
+    3 mm bar is a third firmer. It stays clear of the back."""
+    assert P.det_h >= P.btn_t * 4 / 3 - 1e-9
+    assert fr.stack_back() + P.det_h <= P.depth - 0.5
+    assert size(fr.button_print())[2] == pytest.approx(P.det_h)
 
 
 # --- Joints -----------------------------------------------------------------
@@ -163,8 +272,8 @@ def test_dovetails_lock_the_halves_sideways(halves):
 
 def test_halves_slide_apart_only_out_of_the_back(halves):
     left, right = halves
-    assert overlap(moved(left, z=P.depth + 1), right) < EPS
-    assert overlap(moved(left, z=0.5), right) < EPS
+    for z in (0.5, 2, 4, 6, 8, 10, 12, P.depth + 1):  # clear of the seam button pegs all the way
+        assert overlap(moved(left, z=z), right) < EPS, z
     assert overlap(moved(left, z=-0.1), right) > EPS  # the ramp stops it seated
 
 
@@ -175,11 +284,14 @@ def test_seam_is_flush_at_the_front(halves):
         assert overlap(half, fr.box(x0, x1, -h, h, 0, 0.05)) > EPS
 
 
-def test_joint_clearance_when_seated(halves):
+def test_dovetail_is_snug_when_seated_with_room_going_in(halves):
+    """No clearance when seated; the taper gives room until the last few mm."""
     left, right = halves
-    clr = P.joint_clr
-    assert overlap(left, moved(right, y=clr - 0.03)) < EPS
-    assert overlap(left, moved(right, y=-(clr - 0.03))) < EPS
+    room = math.tan(math.radians(P.joint_taper)) * 3
+    for dy in (0.05, -0.05):
+        assert overlap(left, moved(right, y=dy)) > EPS
+    for dy in (room - 0.02, -(room - 0.02)):
+        assert overlap(moved(left, z=3), moved(right, y=dy)) < EPS
 
 
 # --- Hanging -------------------------------------------------------------------
@@ -187,19 +299,16 @@ def test_joint_clearance_when_seated(halves):
 
 def test_nail_head_hangs_in_every_keyhole(body):
     zl = P.depth - P.key_lip
-    for side, deg, yr, _ in fr.sides():
-        for c, has_tab in fr.pads(side):
-            if not has_tab:
-                continue
-            y0 = yr + P.tab_t + fr.tab_back() + P.key_web + P.key_head / 2
-            zs = zl - (P.key_head - P.key_neck) / 2  # top of the straight-sided room
-            head = fr.cyl(P.key_head / 2 - 0.2, zs - 1.4, zs - 0.1, c, y0 + P.key_throw)
-            shank = fr.cyl(P.key_neck / 2 - 0.2, zs - 0.1, P.depth + 2, c, y0 + P.key_throw)
-            nail = fr.turn(head.union(shank), deg)
-            assert overlap(body, nail) < EPS, side
-            assert overlap(body, moved(nail, z=0.5)) > EPS, side  # cannot pull out
-            entry = fr.turn(fr.cyl(P.key_head / 2 - 0.1, zs - 1.4, P.depth + 2, c, y0), deg)
-            assert overlap(body, entry) < EPS, side
+    for deg, yr, c in fr.locks():
+        y0 = fr.key_entry(yr)
+        zs = zl - (P.key_head - P.key_neck) / 2  # top of the straight-sided room
+        head = fr.cyl(P.key_head / 2 - 0.2, zs - 1.4, zs - 0.1, c, y0 + P.key_throw)
+        shank = fr.cyl(P.key_neck / 2 - 0.2, zs - 0.1, P.depth + 2, c, y0 + P.key_throw)
+        nail = fr.turn(head.union(shank), deg)
+        assert overlap(body, nail) < EPS, (deg, c)
+        assert overlap(body, moved(nail, z=0.5)) > EPS, (deg, c)  # cannot pull out
+        entry = fr.turn(fr.cyl(P.key_head / 2 - 0.1, zs - 1.4, P.depth + 2, c, y0), deg)
+        assert overlap(body, entry) < EPS, (deg, c)
 
 
 # --- Other sizes ----------------------------------------------------------------
@@ -221,19 +330,16 @@ def test_small_frame_prints_in_one_piece():
     assert overlap(part, contents(p)) < EPS
 
 
-def test_every_lattice_run_holds_whole_cells():
-    for side, _, _, half in fr.sides():
-        for a, b in fr.runs(side, half):
-            n = round((b - a) / P.cell)
-            assert abs((b - a) / n - P.cell) < P.cell * 0.15, (side, a, b)
-
-
 # --- Fit tests -----------------------------------------------------------------
 
 
 def test_fit_tests_use_little_plastic(parts):
-    for name in ("test_seam_left", "test_seam_right", "test_tab"):
-        assert fr.grams(parts[name]) < 8, name
+    for name in ("test_seam_left", "test_seam_right", "test_lock"):
+        assert fr.grams(parts[name]) < 12, name
+
+
+def test_frame_takes_six_buttons():
+    assert fr.buttons() == 6
 
 
 def test_seam_test_pieces_join(parts):
