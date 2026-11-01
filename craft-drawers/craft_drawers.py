@@ -787,3 +787,66 @@ def hex_key(af, angle, p=P):
     pts = [turn_pt((r, 0), 60 * k + angle) for k in range(6)]
     zm = mouth_z(p)
     return prism(pts, zm - p.socket_depth + 0.1, zm + 10).translate((*rod_xy(p), 0))
+
+
+# --- Whole chest --------------------------------------------------------------
+
+
+def tip_margin(load=300.0, drawer=3, p=P):
+    """Moment (g mm) about the frame's front bottom edge with one drawer at
+    its stop and `load` grams at its centre. Positive: it stays standing."""
+    def m(part, t=0.0):
+        c = cq.Shape.centerOfMass(part.val())
+        return grams(part), c.y - t
+
+    items = [m(make_frame(p))]
+    items += [m(make_drawer(i, p)) for i in range(p.bays) if i != drawer]
+    t = travel_stop(p)
+    items.append(m(make_drawer(drawer, p).translate((0, -t, 0)), 0.0))
+    items.append((load, drawer_box(p)[3] / 2 - t))
+    return sum(g * y for g, y in items)
+
+
+def on_back(part):
+    """Turned onto its back like the frame, resting on the bed."""
+    t = part.rotate((0, 0, 0), (1, 0, 0), -90)
+    return t.translate((0, 0, -t.val().BoundingBox().zmin))
+
+
+def fit_test_parts(p=P):
+    """Small prints to check the keyhole, detent and key before the frame: the
+    frame's top corner round the slot, and the top of the rod."""
+    x0, x1, y0, y1 = slot(p)
+    corner = make_frame(p).intersect(box(70.0, p.width / 2 + 1, -1, 36.0, 220.0, p.height + 1))
+    rod = make_rod(LOCKED, p).intersect(box(-200, 200, -200, 200, 220.0, p.height))
+    return {"test_corner": on_back(corner), "test_rod": rod_print(rod, LOCKED, p)}
+
+
+def main(out=Path(__file__).parent / "out", p=P):
+    out.mkdir(exist_ok=True)
+    frame = make_frame(p)
+    drawers = [make_drawer(i, p) for i in range(p.bays)]
+    rod, badge, key = make_rod(LOCKED, p), make_badge(p), make_key(LOCKED, p)
+    asm = cq.Assembly()
+    asm.add(frame, name="frame", color=cq.Color("white"))
+    for i, (d, c) in enumerate(zip(drawers, ("red", "yellow", "blue", "green"))):
+        asm.add(d, name=f"drawer_{i}", color=cq.Color(c))
+    for name, part in (("rod", rod), ("badge", badge), ("key", key)):
+        asm.add(part, name=name, color=cq.Color("gray80"))
+    asm.export(str(out / "assembly.step"))
+    parts = {"frame": frame_print(frame, p)}
+    parts |= {f"drawer_{i}": drawer_print(d, i, p) for i, d in enumerate(drawers)}
+    parts |= {"divider": divider_print(make_divider(p), p), "rod": rod_print(rod, LOCKED, p), "badge": badge_print(badge, p), "key": key_print(key, p)}
+    parts |= fit_test_parts(p)
+    for name, part in parts.items():
+        bb = part.val().BoundingBox()
+        cq.exporters.export(part, str(out / f"{name}.step"))
+        cq.exporters.export(part, str(out / f"{name}.stl"), tolerance=0.01, angularTolerance=0.1)
+        print(f"{name:12s} {bb.xlen:6.1f} x {bb.ylen:6.1f} x {bb.zlen:5.1f} mm  {grams(part):6.1f} g")
+    w, d, h = outside(p)
+    total = grams(frame) + sum(grams(x) for x in drawers)
+    print(f"chest {w:.1f} x {d:.1f} x {h:.1f} mm, frame and drawers {total:.0f} g")
+
+
+if __name__ == "__main__":
+    main()

@@ -246,3 +246,28 @@ def test_lock_parts_print(rod_locked, badge):
         assert len(part.solids().vals()) == 1
         assert max(size(part)) <= P.bed
         assert cd.overhang_area(part, allow=allow) < 5.0
+
+
+# --- Whole chest ------------------------------------------------------------
+
+
+def test_weight_budget(frame, drawers):
+    total = cd.grams(frame) + sum(cd.grams(d) for d in drawers)
+    assert total < 1150
+
+
+def test_does_not_tip_with_top_drawer_out():
+    # top drawer at its stop holding 300 g at its centre: the moment about the
+    # frame's front bottom edge stays on the frame's side
+    assert cd.tip_margin(load=300.0, drawer=3) > 0
+
+
+def test_tips_only_with_an_absurd_load():
+    # the check can fail: a 5 kg load in the open top drawer tips it
+    assert cd.tip_margin(load=5000.0, drawer=3) < 0
+
+
+def test_fit_test_parts_fit():
+    for part in cd.fit_test_parts().values():
+        assert len(part.solids().vals()) >= 1
+        assert max(size(part)) <= P.bed
