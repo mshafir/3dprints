@@ -341,7 +341,7 @@ def test_stop_leaf_is_short_and_wide():
 
 def test_top_drawer_clear_of_screw_bosses():
     x1 = cd.drawer_box()[1]
-    assert min(x for x, y in P.screws) - P.boss_r - x1 >= 0.5
+    assert min(x for x, y in cd.screw_xy()) - P.boss_r - x1 >= 0.5
 
 
 def test_rod_stays_in_floor_socket_at_full_lift():
@@ -381,3 +381,106 @@ def test_stop_halts_the_rod_before_the_cam_lets_go(badge):
 def test_back_stop_catch_is_deep():
     assert cd.stop_catch() >= 2.5
     assert cd.stop_catch() - cd.side_play() >= 2.0
+
+
+# --- Mini chest: one drawer, to try the mechanism before the full print -------
+
+M = cd.MINI
+
+
+@pytest.fixture(scope="module")
+def mini():
+    return {
+        "frame": cd.make_frame(M),
+        "drawer": cd.make_drawer(0, M),
+        "locked": cd.make_rod(cd.LOCKED, M),
+        "unlocked": cd.make_rod(cd.UNLOCKED, M),
+        "badge": cd.make_badge(M),
+    }
+
+
+def test_mini_is_small_and_cheap(mini):
+    w, d, h = cd.outside(M)
+    assert w <= 120 and d <= 130 and h <= 75
+    total = cd.grams(mini["frame"]) + cd.grams(mini["drawer"]) + cd.grams(mini["locked"]) + cd.grams(mini["badge"])
+    assert total < 250
+
+
+def test_mini_keeps_the_mechanism_sizes():
+    # everything that moves, catches or clicks is the full chest's
+    for name in ("rod_r", "rod_dx", "rod_y", "cam_r", "cam_w", "cam_h", "cam_z", "pocket_clr", "head_r", "bore_r", "key_depth",
+                 "lug_r", "tooth_r", "tooth_a", "det_press", "nub_r", "notch_r", "leaf_w", "leaf_len", "nub_out", "rail_out",
+                 "gap_left", "guide", "rib", "rib_w", "div_slot", "div_t", "handle_out", "bar_t", "bar_h", "front_t", "wall"):
+        assert getattr(M, name) == getattr(P, name), name
+    assert cd.pitch(M) == cd.pitch(P)
+
+
+def test_mini_parts_are_single_solids(mini):
+    for part in mini.values():
+        assert len(part.solids().vals()) == 1 and part.val().isValid()
+
+
+def test_mini_frame_closed_and_printable(mini):
+    assert cd.outside_openings(mini["frame"], M) == ["front"]
+    allow = [cd.frame_print(z, M) for z in cd.bridge_zones(M)]
+    assert cd.overhang_area(cd.frame_print(mini["frame"], M), allow=allow) < 5.0
+
+
+def test_mini_drawer_runs_and_stops(mini):
+    f = mini["frame"]
+    assert overlap(f, mini["drawer"]) < EPS
+    for t in (10, cd.travel_stop(M) - 1):
+        assert overlap(f, cd.drawer_at(0, t, M)) < EPS
+    assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M)) > EPS
+    assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M).translate((cd.side_play(M), 0, 0))) > EPS
+    assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M, pressed=True)) < EPS
+
+
+def test_mini_lock_holds_and_frees(mini):
+    locked, unlocked = mini["locked"], mini["unlocked"]
+    assert overlap(mini["frame"], locked) < EPS and overlap(mini["frame"], unlocked) < EPS
+    assert overlap(locked, mini["drawer"]) < EPS
+    for a in (0, 10, 20):
+        assert overlap(cd.make_rod(cd.LOCKED + a, M), cd.drawer_at(0, 8.0, M)) > EPS
+    for t in (0, 30, cd.travel_stop(M) - 1):
+        assert overlap(unlocked, cd.drawer_at(0, t, M)) < EPS
+
+
+def test_mini_open_drawer_blocks_the_key():
+    for t in (1, 5, 30):
+        d = cd.drawer_at(0, t, M)
+        assert any(overlap(cd.make_rod(a, M), d) > EPS for a in range(cd.UNLOCKED, cd.LOCKED + 1, 15))
+
+
+def test_mini_turn_clear_and_stopped(mini):
+    for a in range(cd.UNLOCKED, cd.LOCKED + 1, 15):
+        rod = cd.make_rod(a, M)
+        assert overlap(mini["frame"], rod) < EPS and overlap(mini["drawer"], rod) < EPS
+    assert overlap(mini["badge"], cd.make_rod(cd.LOCKED + 12, M)) > EPS
+
+
+def test_mini_badge_key_and_rod_fit(mini):
+    badge, locked = mini["badge"], mini["locked"]
+    assert overlap(mini["frame"], badge) < EPS and overlap(badge, locked) < EPS
+    assert overlap(badge, mini["unlocked"]) < EPS
+    bore = cd.cyl(M.bore_r, 0, 300, *cd.rod_xy(M))
+    assert cd.covers(badge, *cd.slot(M), z=M.height + 0.5, holes=[bore])
+    assert overlap(locked, cd.make_key(cd.LOCKED, M)) < EPS and overlap(badge, cd.make_key(cd.LOCKED, M)) < EPS
+    for dz in range(0, 80, 10):
+        assert overlap(mini["frame"], locked.translate((0, 0, dz))) < EPS
+
+
+def test_mini_divider_and_front(mini):
+    for slot in range(len(M.div_xs)):
+        assert overlap(mini["drawer"], cd.divider_in(0, slot, M)) < EPS
+    assert overlap(mini["drawer"], cd.face_shape(0, M)) < EPS
+    bb = cd.face_shape(0, M).val().BoundingBox()
+    assert bb.xmax < -M.handle_w / 2 - 3 and bb.xmin > -M.width / 2 + 3
+
+
+def test_mini_parts_print(mini):
+    parts = cd.mini_parts()
+    for name, part in parts.items():
+        assert max(size(part)) <= P.bed, name
+    assert cd.overhang_area(parts["mini_drawer"]) < 5.0
+    assert cd.overhang_area(parts["mini_divider"]) < 1.0

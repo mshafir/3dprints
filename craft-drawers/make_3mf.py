@@ -4,7 +4,8 @@ settings and colours already chosen.
 Run `uv run make_3mf.py` from this folder after `craft_drawers.py` has written
 out/. It drives Bambu Studio (the flatpak on Linux, the app on macOS) from the
 command line, so the project is written by Studio itself, as
-out/craft_drawers.3mf: the fit test first, then the frame, one plate per
+out/craft_drawers.3mf: the fit test and the one-drawer mini chest first,
+then the frame, one plate per
 drawer in its own colour, the lock parts and the dividers. Slice each plate
 in Studio before sending it.
 """
@@ -54,9 +55,13 @@ FILAMENTS = {
 }
 
 # Plate name -> (STL name, filament, copies). Print the fit test first: it
-# checks the keyhole, the key and the click before the 10 hour frame.
+# checks the keyhole, the key and the click in minutes. Then the mini chest,
+# a one-drawer chest with the full-size lock, stop, handle and divider slots,
+# to try the whole mechanism before the 10 hour frame.
 PLATES = {
     "Fit test": [("test_corner", WHITE, 1), ("test_rod", WHITE, 1), ("badge", WHITE, 1), ("key", WHITE, 1)],
+    "Mini chest": [("mini_frame", WHITE, 1), ("mini_rod", WHITE, 1), ("mini_badge", WHITE, 1), ("mini_key", WHITE, 1), ("mini_divider", WHITE, 1)],
+    "Mini drawer": [("mini_drawer", RED, 1)],
     "Frame": [("frame", WHITE, 1)],
     "Drawer 1": [("drawer_0", RED, 1)],
     "Drawer 2": [("drawer_1", YELLOW, 1)],

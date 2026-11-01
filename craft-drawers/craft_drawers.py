@@ -115,10 +115,10 @@ class Params:
 
     # Lock badge on top, over the slot the rod goes in by
     badge_t: float = 3.0
-    badge_x: tuple = (76.0, 101.0)
-    badge_y: tuple = (-1.0, 37.0)
+    badge_x: tuple = (-15.3, 9.7)  # from the rod's axis
+    badge_y: tuple = (-14.0, 24.0)
     badge_chamfer: float = 1.0
-    screws: tuple = ((88.0, 31.5), (96.5, 31.5))  # behind the tube and the icons, clear of the top drawer
+    screws: tuple = ((-3.3, 18.5), (5.2, 18.5))  # from the rod's axis: behind the tube and the icons, clear of the top drawer
     screw_pilot: float = 2.6
     screw_clear: float = 3.4
     cbore_r: float = 3.25
@@ -168,6 +168,11 @@ class Params:
 
 
 P = Params()
+
+# A one-drawer chest from the same code, to try the lock, stop, click, key
+# and dividers before printing the full chest: narrower, shallower and one
+# bay tall, with every moving part the full size.
+MINI = Params(width=110.0, depth=100.0, height=65.0, bays=1, handle_w=60.0, face_size=16.0, div_xs=(-20.0, 20.0))
 
 
 # --- Sizes --------------------------------------------------------------------
@@ -249,6 +254,11 @@ def stop_catch(p=P):
 def stop_y(p=P):
     """Back end of the stop rail."""
     return nub_front_y(p) - travel_stop(p)
+
+
+def screw_xy(p=P):
+    x, y = rod_xy(p)
+    return [(x + dx, y + dy) for dx, dy in p.screws]
 
 
 def slot(p=P):
@@ -466,11 +476,11 @@ def screw_bosses(p=P):
     xl, xr = inner_x(p)
     top = p.height - p.cap
     room = box(xl, xr, 0, p.depth - p.back, p.cap, top + 0.1)
-    return [teardrop(p.boss_r, top - p.boss_len, top + 0.1, x, y).intersect(room) for x, y in p.screws]
+    return [teardrop(p.boss_r, top - p.boss_len, top + 0.1, x, y).intersect(room) for x, y in screw_xy(p)]
 
 
 def screw_holes(p=P):
-    return [teardrop(p.screw_pilot / 2, p.height - p.cap - p.boss_len - 0.1, p.height + 0.1, x, y, toward=-1) for x, y in p.screws]
+    return [teardrop(p.screw_pilot / 2, p.height - p.cap - p.boss_len - 0.1, p.height + 0.1, x, y, toward=-1) for x, y in screw_xy(p)]
 
 
 def top_slot(p=P):
@@ -480,11 +490,12 @@ def top_slot(p=P):
 
 def decor(p=P):
     """One of each shape on each side, recessed."""
-    spots = [(55.0, 75.0), (130.0, 75.0), (55.0, 170.0), (130.0, 170.0)]
+    spots = [(p.depth * u, p.height * v) for v in (0.3, 0.69) for u in (0.3, 0.7)]
     out = []
     for side, inward in ((p.width / 2, -1), (-p.width / 2, 1)):
         names = SHAPES if inward < 0 else SHAPES[::-1]
-        out += [shape_on_side(n, u, v, p.decor_size, side, inward, p.decor_depth) for n, (u, v) in zip(names, spots)]
+        size = min(p.decor_size, 0.35 * p.height)
+        out += [shape_on_side(n, u, v, size, side, inward, p.decor_depth) for n, (u, v) in zip(names, spots)]
     return out
 
 
@@ -824,7 +835,8 @@ def make_badge(p=P):
     """The lock badge in place on top: plate, keyhole tube and detent leaf."""
     x, y = rod_xy(p)
     top = p.height + p.badge_t
-    (bx0, bx1), (by0, by1) = p.badge_x, p.badge_y
+    bx0, bx1 = x + p.badge_x[0], x + p.badge_x[1]
+    by0, by1 = y + p.badge_y[0], y + p.badge_y[1]
     plate = box(bx0, bx1, by0, by1, p.height, top).edges("|Z").fillet(3.0).faces(">Z").edges().chamfer(p.badge_chamfer)
     ro = p.bore_r + p.tube_wall
     zt = badge_tube_bottom(p)
@@ -833,7 +845,7 @@ def make_badge(p=P):
     # into the bore so no web joins the leaf to the tube
     slits = [box(sx, sx + 0.6, y + p.bore_r - 1.0, y + ro + 0.1, zt - 0.1, p.height - p.cap) for sx in (x - p.det_w / 2 - 0.6, x + p.det_w / 2)]
     holes = [cyl(p.bore_r, zt - 0.1, top + 0.1, x, y)]
-    for sx, sy in p.screws:
+    for sx, sy in screw_xy(p):
         holes += [cyl(p.screw_clear / 2, p.height - 0.1, top + 0.1, sx, sy).union(cyl(p.cbore_r, top - p.cbore_d, top + 0.1, sx, sy))]
     b = cut_all(cut_all(b, holes), slits)  # the slits run into the bore
     b = b.union(cyl(p.nub_r, zt, mouth_z(p), x, y + p.bore_r))
@@ -860,7 +872,7 @@ def badge_bridges(p=P):
     """The counterbores' floors, rings round the screw holes: bridges when
     the badge prints top down."""
     top = p.height + p.badge_t
-    return [cyl(p.cbore_r + 0.2, top - p.cbore_d - 0.1, top - p.cbore_d + 0.1, sx, sy) for sx, sy in p.screws]
+    return [cyl(p.cbore_r + 0.2, top - p.cbore_d - 0.1, top - p.cbore_d + 0.1, sx, sy) for sx, sy in screw_xy(p)]
 
 
 def badge_print(part, p=P):
@@ -936,9 +948,23 @@ def fit_test_parts(p=P):
     """Small prints to check the keyhole, detent and key before the frame: the
     frame's top corner round the slot, and the top of the rod."""
     x0, x1, y0, y1 = slot(p)
-    corner = make_frame(p).intersect(box(70.0, p.width / 2 + 1, -1, 36.0, 220.0, p.height + 1))
-    rod = make_rod(LOCKED, p).intersect(box(-200, 200, -200, 200, 220.0, p.height))
+    x, _ = rod_xy(p)
+    corner = make_frame(p).intersect(box(x - 21.3, p.width / 2 + 1, -1, 36.0, p.height - 28.0, p.height + 1))
+    rod = make_rod(LOCKED, p).intersect(box(-200, 200, -200, 200, p.height - 28.0, p.height))
     return {"test_corner": on_back(corner), "test_rod": rod_print(rod, LOCKED, p)}
+
+
+def mini_parts(m=MINI):
+    """The mini chest's parts, turned to print."""
+    rod = make_rod(LOCKED, m)
+    return {
+        "mini_frame": frame_print(make_frame(m), m),
+        "mini_drawer": drawer_print(make_drawer(0, m), 0, m),
+        "mini_divider": divider_print(make_divider(m), m),
+        "mini_rod": rod_print(rod, LOCKED, m),
+        "mini_badge": badge_print(make_badge(m), m),
+        "mini_key": key_print(make_key(LOCKED, m), m),
+    }
 
 
 def main(out=Path(__file__).parent / "out", p=P):
@@ -957,6 +983,7 @@ def main(out=Path(__file__).parent / "out", p=P):
     parts |= {f"drawer_{i}": drawer_print(d, i, p) for i, d in enumerate(drawers)}
     parts |= {"divider": divider_print(make_divider(p), p), "rod": rod_print(rod, LOCKED, p), "badge": badge_print(badge, p), "key": key_print(key, p)}
     parts |= fit_test_parts(p)
+    parts |= mini_parts()
     for name, part in parts.items():
         bb = part.val().BoundingBox()
         cq.exporters.export(part, str(out / f"{name}.step"))

@@ -1,5 +1,22 @@
 # Craft drawers design
 
+## Revision 5 (2026-11-01)
+
+- **A one-drawer mini chest to test the mechanism**, at the user's request.
+  It is built by the same code with `MINI` parameters: 110 mm wide, 100 mm
+  deep, one bay tall (65 mm plus the badge), and about 186 g.
+  - Every part that moves, catches or clicks is full size: the rod's cam
+    and pocket, the stop tooth, the click, the key and keyhole, the back stop,
+    the bar handle (60 mm wide here) and the divider ribs. A test checks those
+    sizes match the full chest.
+  - It does not test the rod's support forks between drawers, which only
+    exist between bays.
+  - Its badge and key are the same shape as the full chest's, so they can be
+    kept and reused.
+- **Badge and screw positions are measured from the rod.** The side shapes'
+  positions scale with the frame, so the same code builds both sizes. The
+  full chest is unchanged.
+
 ## Revision 4 (2026-11-01)
 
 This note supersedes the earlier revisions and the body below where they
