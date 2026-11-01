@@ -11,7 +11,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "gmsh==4.15.2",
     "pytest==9.1.1",
+    "scikit-fem==12.0.2",
 ]
 
 # Scripts only: there is no package to build or install
