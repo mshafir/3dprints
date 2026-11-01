@@ -1,5 +1,17 @@
 # Craft drawers design
 
+## Revision 6 (2026-11-01)
+
+- **Bambu Studio flagged both frames with a "floating cantilever".** Both
+  causes are fixed, and every part now slices with no warning and no
+  supports:
+  - The screw bosses under the badge each start in mid-air when the frame
+    prints on its back. Each boss now has a 1.6 mm web running back to the
+    back wall, which sits on the bed.
+  - The fork arm in front of the rod had a flat underside. It now meets the
+    rod on a 45 degree face, touching the rod's clearance circle, so it still
+    takes the pull of a locked drawer.
+
 ## Revision 5 (2026-11-01)
 
 - **A one-drawer mini chest to test the mechanism**, at the user's request.

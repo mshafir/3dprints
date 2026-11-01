@@ -484,3 +484,21 @@ def test_mini_parts_print(mini):
         assert max(size(part)) <= P.bed, name
     assert cd.overhang_area(parts["mini_drawer"]) < 5.0
     assert cd.overhang_area(parts["mini_divider"]) < 1.0
+
+
+def test_screw_bosses_grow_from_the_back_wall():
+    # printed on its back, a boss that hangs off the top wall alone starts in
+    # mid-air (Bambu Studio: "floating cantilever"); a web runs it back to the
+    # back wall, which is on the bed
+    for p in (P, M):
+        for b in cd.screw_bosses(p):
+            assert b.val().BoundingBox().ymax >= p.depth - p.back
+
+
+def test_forks_hold_the_rod_forward_with_a_45_degree_face(rod_locked):
+    # the fork's front arm meets the rod on a 45 degree face, so it grows from
+    # the ledge when the frame prints on its back, and still takes the pull
+    forks = cd.combo(*[cd.ledges()[k] for k in range(len(cd.ledges())) if k % 3 == 1][1:])
+    assert overlap(forks, rod_locked) < EPS
+    assert overlap(forks, rod_locked.translate((0, -1.0, 0))) > EPS
+    assert len(cd.bridge_zones()) == P.bays + 1 + 4  # rail ends, the slot, the bumpers: no fork arms

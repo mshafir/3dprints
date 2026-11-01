@@ -125,6 +125,7 @@ class Params:
     cbore_d: float = 1.8
     boss_r: float = 3.5
     boss_len: float = 10.0
+    web: float = 1.6  # runs each screw boss back to the back wall
 
     # Drawer stop: a leaf in the drawer's left wall carries a nub that meets
     # the back end of a rail on the frame's left wall
@@ -443,13 +444,17 @@ def ledges(p=P):
 
 def fork_notch(z, p=P):
     """Notch round the rod in a right ledge, open toward the drawers. The
-    front arm bears on the rod; past the rod its edge runs off forward at 45
-    degrees so it prints."""
+    front arm meets the rod on a 45 degree face, touching the rod's circle,
+    so it grows from the ledge when the frame prints on its back and still
+    takes the pull of a locked drawer."""
     x, y = rod_xy(p)
     r = p.rod_r + p.fork_clr
     xe = drawer_box(p)[1] - p.ledge_under - 1
-    flat = x - p.rod_r + 1.0  # the arm stays square across the rod's front
-    pts = [(x + r, y - r), (x + r, y + r), (xe, y + r), (xe, y - r - (flat - xe)), (flat, y - r)]
+
+    def arm(xa):  # the 45 degree face, tangent to radius r at -45 degrees
+        return y - r * math.sqrt(2) - x + xa
+
+    pts = [(x + r, y + r), (xe, y + r), (xe, arm(xe)), (x + r, arm(x + r))]
     return prism(pts, z - 0.1, z + p.ledge_t + 0.1)
 
 
@@ -473,10 +478,13 @@ def rails(p=P):
 
 
 def screw_bosses(p=P):
+    """Hanging from the top wall, each with a web back to the back wall: the
+    frame prints on its back, and a boss alone would start in mid-air."""
     xl, xr = inner_x(p)
     top = p.height - p.cap
-    room = box(xl, xr, 0, p.depth - p.back, p.cap, top + 0.1)
-    return [teardrop(p.boss_r, top - p.boss_len, top + 0.1, x, y).intersect(room) for x, y in screw_xy(p)]
+    room = box(xl, xr, 0, p.depth - p.back + 0.1, p.cap, top + 0.1)
+    w = p.web
+    return [teardrop(p.boss_r, top - p.boss_len, top + 0.1, x, y).union(box(x - w / 2, x + w / 2, y, p.depth, top - p.boss_len, top + 0.1)).intersect(room) for x, y in screw_xy(p)]
 
 
 def screw_holes(p=P):
@@ -520,12 +528,11 @@ def frame_print(part, p=P):
 
 def bridge_zones(p=P):
     """Where the frame, printed on its back, has planned flat undersides, in
-    frame coordinates: the rails' square back ends, the fork arms across the
-    rod, the slot's edge and the bumper pockets."""
+    frame coordinates: the rails' square back ends, the slot's edge and the
+    bumper pockets."""
     xl = inner_x(p)[0]
     x, y = rod_xy(p)
     zones = [box(xl - 0.1, xl + p.rail_out + 0.1, stop_y(p) - 0.2, stop_y(p) + 0.2, *nub_z(i, p)) for i in range(p.bays)]
-    zones += [box(x - p.rod_r, x + p.rod_r + 1, y - p.rod_r - 0.6, y - p.rod_r, bay_z(i, p) - 0.1, bay_z(i, p) + p.ledge_t + 0.1) for i in range(1, p.bays)]
     x0, x1, y0, y1 = slot(p)
     zones.append(box(x0 - 0.1, x1 + 0.1, y0 - 0.2, y0 + 0.2, p.height - p.cap - 0.1, p.height + 0.1))
     zones += [cyl(p.bump_r + 0.2, -0.1, p.bump_d + 0.1, *c.val().Center().toTuple()[:2]) for c in bumpers(p)]
