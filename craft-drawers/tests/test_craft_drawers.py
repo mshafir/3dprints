@@ -28,7 +28,8 @@ def size(part):
 def test_outside_fits_shelf_and_bed():
     w, d, h = cd.outside()
     assert w == pytest.approx(203.2)
-    assert d <= 203.2
+    assert d - P.handle_out <= 203.2  # only the handles stand past an 8 in shelf
+    assert P.handle_out <= 25.0
     assert P.height <= P.bed
 
 
@@ -125,8 +126,17 @@ def test_stop_holds_and_releases(frame):
         assert overlap(frame, cd.drawer_at(1, t, pressed=True)) < EPS
 
 
-def test_pull_shapes_differ():
-    assert len(set(cd.SHAPES)) == P.bays == 4
+def test_handles_all_the_same(drawers):
+    vols = [d.val().Volume() for d in drawers]
+    assert max(vols) - min(vols) < 1.0
+
+
+def test_handle_fits_a_hand(drawers):
+    # four fingers, 16 mm across and 70 mm wide, slide in behind the bar
+    x0, x1, z0, z1, y_back = cd.handle_grip(0)
+    assert x1 - x0 >= 70.0 and z1 - z0 >= 8.0
+    fingers = cd.box(-35, 35, -P.front_t - 15.9, -P.front_t - 0.1, z0, z1)
+    assert overlap(drawers[0], fingers) < EPS
 
 
 def test_divider_fits(drawers):

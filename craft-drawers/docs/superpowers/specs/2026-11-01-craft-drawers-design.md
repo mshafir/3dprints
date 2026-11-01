@@ -1,5 +1,20 @@
 # Craft drawers design
 
+## Revision 3 (2026-11-01)
+
+This note supersedes the earlier revisions and the body below where they
+differ.
+
+- **The user asked for handles that are easier to use, all the same, with no
+  fun shapes.** Every drawer now has the same bar handle. It is 98 mm wide
+  overall and stands 22 mm off the front. There is a 16 mm deep, 82 mm wide
+  gap behind the bar, so a child's whole hand can wrap round it and pull.
+  The posts and the bar's underside slope at 45 degrees, so it prints upright.
+- **The chest is now 208.4 mm deep at the handles.** The handles stand about
+  5 mm past the front of an 8 in shelf, which the user accepted. The frame
+  and drawer fronts still fit within 8 in.
+- **The drawer colours and the recessed shapes on the frame's sides stay.**
+
 ## Revision 2 (2026-11-01, after the final review)
 
 This note supersedes Revision 1 and the body below where they differ. All of

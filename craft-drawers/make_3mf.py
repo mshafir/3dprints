@@ -58,10 +58,10 @@ FILAMENTS = {
 PLATES = {
     "Fit test": [("test_corner", WHITE, 1), ("test_rod", WHITE, 1), ("badge", WHITE, 1), ("key", WHITE, 1)],
     "Frame": [("frame", WHITE, 1)],
-    "Drawer 1 (circle)": [("drawer_0", RED, 1)],
-    "Drawer 2 (triangle)": [("drawer_1", YELLOW, 1)],
-    "Drawer 3 (square)": [("drawer_2", BLUE, 1)],
-    "Drawer 4 (star)": [("drawer_3", GREEN, 1)],
+    "Drawer 1": [("drawer_0", RED, 1)],
+    "Drawer 2": [("drawer_1", YELLOW, 1)],
+    "Drawer 3": [("drawer_2", BLUE, 1)],
+    "Drawer 4": [("drawer_3", GREEN, 1)],
     "Lock": [("rod", WHITE, 1), ("badge", WHITE, 1), ("key", WHITE, 2)],
     "Dividers": [("divider", WHITE, 4)],
 }

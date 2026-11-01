@@ -21,14 +21,14 @@ LOCKED = 180  # cams point -x, at the drawers' tabs
 UNLOCKED = 90  # cams point back, clear of the tabs: unlocking turns clockwise,
 # so a pull on a locked drawer, which turns the cams counter-clockwise, drives
 # the rod into its stop instead of toward unlocked
-SHAPES = ("circle", "triangle", "square", "star")  # pulls, bottom drawer up
+SHAPES = ("circle", "triangle", "square", "star")  # recessed in the frame's sides
 
 
 @dataclass(frozen=True)
 class Params:
     # Outside
     width: float = 203.2  # 8 in
-    depth: float = 184.0  # the pulls take it to 200.4 on an 8 in shelf
+    depth: float = 184.0  # the fronts take it to 186.4; the handles stand 22 mm past
     height: float = 248.0
     side: float = 1.8
     cap: float = 2.0  # top and bottom
@@ -52,10 +52,15 @@ class Params:
     front_gap: float = 1.0  # between neighbouring fronts
     front_r: float = 4.0
 
-    # Pulls
-    pull_size: float = 34.0
-    pull_proud: float = 14.0
-    pull_shears: int = 8
+    # Bar handle, the same on every drawer: two posts and a bar a hand wraps
+    # round. Everything under it is 45 degrees, so it prints upright; the bar
+    # starts from a point, so only its first lines bridge.
+    handle_out: float = 22.0  # front plate to the bar's front
+    handle_w: float = 98.0  # outside of the posts
+    post_w: float = 8.0
+    bar_t: float = 6.0  # front to back
+    bar_h: float = 9.0  # top to the point underneath
+    handle_up: float = 10.0  # bar top above the front's middle
 
     # Lock: a rod behind the front post, with one cam per drawer. Locked, a
     # cam stands in a notch in its drawer's fin, ahead of the tab behind it.
@@ -251,8 +256,8 @@ def fork_zs(p=P):
 
 
 def outside(p=P):
-    """Width, depth with the pulls, height with the lock badge."""
-    return p.width, p.depth + p.front_t + p.pull_proud, p.height + p.badge_t
+    """Width, depth with the handles, height with the lock badge."""
+    return p.width, p.depth + p.front_t + p.handle_out, p.height + p.badge_t
 
 
 # --- Solid-building helpers ---------------------------------------------------
@@ -540,27 +545,29 @@ def front_plate(i, p=P):
     return plate.edges("|Y and <Z").chamfer(1.0)
 
 
-def pull(i, p=P):
-    """The drawer's shape, standing proud of the plate. Every section is the
-    shape cut by itself raised by up to its depth, so no underside is flatter
-    than 45 degrees."""
-    cx = 0.0
-    cz = (drawer_z(i, p) + bay_z(i, p) + pitch(p) - p.front_gap / 2) / 2
-    y0, y1 = -p.front_t + 0.1, -p.front_t - p.pull_proud
-    pts = shape_pts(SHAPES[i], p.pull_size)
+def front_mid(i, p=P):
+    return (drawer_z(i, p) + bay_z(i, p) + pitch(p) - p.front_gap / 2) / 2
 
-    def wire(y, dz):
-        if pts is None:
-            return cq.Wire.makeCircle(p.pull_size / 2, cq.Vector(cx, y, cz + dz), cq.Vector(0, 1, 0))
-        return cq.Wire.makePolygon([cq.Vector(cx + u, y, cz + v + dz) for u, v in pts], close=True)
 
-    knob = cq.Workplane(obj=cq.Solid.makeLoft([wire(y0, 0), wire(y1, 0)], True))
-    # Several shears, so where one part of the shape sits over another (the
-    # star's arms) the upper part cannot reappear over the gap deeper in
-    for k in range(1, p.pull_shears + 1):
-        rise = (y0 - y1) * k / p.pull_shears
-        knob = knob.intersect(cq.Workplane(obj=cq.Solid.makeLoft([wire(y0, 0), wire(y1, rise)], True)))
-    return knob
+def handle(i, p=P):
+    """Bar handle on the front of drawer i."""
+    y0 = -p.front_t + 0.1
+    yb, yf = -p.front_t - p.handle_out + p.bar_t, -p.front_t - p.handle_out
+    zt = front_mid(i, p) + p.handle_up
+    shoulder = zt - p.bar_h + p.bar_t / 2  # where the bar's 45 degree underside starts
+    bar = yz_prism([(yb, zt), (yb, shoulder), ((yb + yf) / 2, zt - p.bar_h), (yf, shoulder), (yf, zt)], -p.handle_w / 2, p.handle_w / 2)
+    post = [(y0, zt), (yf, zt), (yf, shoulder), (y0, shoulder - (y0 - yf))]
+    x = p.handle_w / 2
+    return bar.union(yz_prism(post, -x, -x + p.post_w)).union(yz_prism(post, x - p.post_w, x))
+
+
+def handle_grip(i, p=P):
+    """The space a hand takes behind the bar: x0, x1, z0, z1, and the bar's
+    back face."""
+    x = p.handle_w / 2 - p.post_w
+    zt = front_mid(i, p) + p.handle_up
+    yb = -p.front_t - p.handle_out + p.bar_t
+    return -x, x, zt - p.bar_h, zt, yb
 
 
 def fin(i, p=P):
@@ -617,7 +624,7 @@ def make_drawer(i, p=P, pressed=False):
         leaf = box(x0, x0 + p.wall, ly0, ly1, z + h - p.leaf_len, z + h)
         d = d.cut(leaf).union(leaf.translate((p.nub_out + 0.2, 0, 0)))
         nub = nub.translate((p.nub_out + 0.2, 0, 0))
-    for part in [front_plate(i, p), pull(i, p), fin(i, p), nub] + div_ribs(i, p):
+    for part in [front_plate(i, p), handle(i, p), fin(i, p), nub] + div_ribs(i, p):
         d = d.union(part)
     return d
 

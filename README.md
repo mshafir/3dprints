@@ -15,7 +15,7 @@ layers and no supports.
 | [`pill-case/`](pill-case/) | Round four-week pill case with a click dial and a sliding door | Printed and revised several times |
 | [`sink-organizer/`](sink-organizer/) | Bathroom sink organizer: a 1 inch grid baseplate with snap-in modules for toothbrushes, toothpaste, an electric toothbrush charger and bar soap | Snap latches redesigned after the first test prints; the new latches are not yet printed |
 | [`frame/`](frame/) | Picture frame for an 11 x 8.5 in glass, picture and easel backing: a plain boxy border printed face up for a flat front, in two halves joined by sliding dovetails, with turn buttons that hold the backing and keyholes for hanging | Designed; not yet printed |
-| [`craft-drawers/`](craft-drawers/) | Four-drawer craft chest for an 8 in deep shelf: a drawer per colour with a circle, triangle, square or star pull, a stop at two thirds out, and a printed key that turns one rod to lock every drawer | Designed; not yet printed |
+| [`craft-drawers/`](craft-drawers/) | Four-drawer craft chest for an 8 in deep shelf: a drawer per colour with a bar handle, a stop at two thirds out, and a printed key that turns one rod to lock every drawer | Designed; not yet printed |
 
 ## Layout
 
