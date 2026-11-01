@@ -1,5 +1,31 @@
 # Craft drawers design
 
+## Revision 4 (2026-11-01)
+
+This note supersedes the earlier revisions and the body below where they
+differ. The changes follow the user's review.
+
+- **The cam catches in a pocket in the drawer's side, not on a fin.** The
+  long fin is gone. Each cam now reaches 3 mm into a pocket cut in a solid
+  post inside the drawer's front right corner. With a drawer open, the
+  drawer's own wall is in the cam's way, so the key won't turn. A locked
+  drawer opens about 5 mm before the pocket's back edge meets the cam.
+  - A pull still turns the rod counter-clockwise, which is unavoidable for a
+    rotating cam. That drives it into the badge's stop.
+  - Tests check that a pulled drawer stays caught up to 20 degrees past
+    locked, which covers the stop plus the rod twisting along its length.
+- **The rod goes in with the drawers out.** The cams are longer and pass over
+  the top drawer's space on the way down. The slot under the badge is longer
+  to match.
+- **The drawer stop is deeper.** The bump now overlaps the rail by 2.8 mm,
+  and by at least 2.3 mm with the drawer pushed sideways. The left gap grew
+  to 4 mm, so the drawers are 177 mm wide inside.
+- **Each drawer's front has its shape** (circle, triangle, square, star)
+  recessed 0.6 mm, about 24 mm across, to the left of the handle. The right of
+  the handle is left clear for a label.
+- **Divider ribs are 3 mm deep and 1.6 mm wide**, with a 1.75 mm slot for the
+  1.4 mm divider.
+
 ## Revision 3 (2026-11-01)
 
 This note supersedes the earlier revisions and the body below where they

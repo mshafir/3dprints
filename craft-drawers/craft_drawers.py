@@ -43,7 +43,7 @@ class Params:
     head_gap: float = 1.0  # drawer top to the ledge above, so a tipped drawer stays put
 
     # Drawer
-    gap_left: float = 2.0  # room for the stop rail
+    gap_left: float = 4.0  # room for the stop rail
     column: float = 16.0  # drawer's right wall to the frame's right inner face: the lock rod
     wall: float = 1.2
     floor: float = 1.2
@@ -62,26 +62,26 @@ class Params:
     bar_h: float = 9.0  # top to the point underneath
     handle_up: float = 10.0  # bar top above the front's middle
 
-    # Lock: a rod behind the front post, with one cam per drawer. Locked, a
-    # cam stands in a notch in its drawer's fin, ahead of the tab behind it.
+    # Lock: a rod in the front right corner with one cam per drawer. Locked, a
+    # cam reaches into a pocket in its drawer's side; with a drawer open, the
+    # drawer's wall is in the cam's way, so the key will not turn.
     rod_r: float = 3.5
-    rod_dx: float = 9.0  # rod axis from the drawer's right wall
+    rod_dx: float = 7.5  # rod axis from the drawer's right wall
     rod_y: float = 13.0
     stile: float = 2.0  # front post ahead of the rod
-    cam_r: float = 8.5  # axis to tip
+    cam_r: float = 10.5  # axis to tip: 3 mm into the drawer's wall
     cam_w: float = 6.0
     cam_h: float = 5.0
     cam_z: float = 24.5  # cam bottom above the drawer's underside
-    fin_reach: float = 4.0
-    fin_z: float = 20.0  # fin bottom above the drawer's underside; 45 degree chamfer to fin_z + 4
-    fin_h: float = 10.0
+    pocket_clr: float = 0.4
+    post_wall: float = 1.2  # behind the pocket, in a post in the drawer's corner
     lock_clr: float = 0.5
     fork_clr: float = 0.55  # round the rod's keel corners, which reach 3.7 mm
 
     # Rod head, under the keyhole tube in the badge
     head_r: float = 4.7
     head_len: float = 5.0
-    flange_r: float = 5.5  # stops the rod lifting out of its floor socket
+    flange_r: float = 5.3  # stops the rod lifting out of its floor socket
     flange_t: float = 1.0
     bore_r: float = 5.0
     tube_wall: float = 1.3
@@ -93,10 +93,10 @@ class Params:
 
     # Stop: a lug on the rod below the badge's tube meets a tooth hanging from
     # the tube just past locked
-    lug_r: float = 7.0
+    lug_r: float = 6.8
     lug_w: float = 3.0
     lug_h: float = 3.0
-    tooth_r: tuple = (5.8, 7.3)
+    tooth_r: tuple = (5.6, 7.3)
     tooth_a: tuple = (200.0, 224.0)  # degrees, absolute
 
     # Socket: three lobes round a hub, turned to keep clear of the detent
@@ -129,22 +129,25 @@ class Params:
     # Drawer stop: a leaf in the drawer's left wall carries a nub that meets
     # the back end of a rail on the frame's left wall
     leaf_w: float = 20.0  # wide and short, to take a yank
-    leaf_len: float = 26.0  # springs from this far below the wall top
+    leaf_len: float = 30.0  # springs from this far below the wall top
     leaf_slit: float = 0.6
     leaf_back: float = 4.0  # leaf's back edge ahead of the inside of the drawer's back wall
-    nub_out: float = 1.5
+    nub_out: float = 3.2
     nub_h: float = 6.0
     nub_top: float = 4.0  # nub top below the wall top
-    rail_out: float = 1.6
+    rail_out: float = 3.6
     guide: float = 0.5  # play to a rib on the right ledge, so a drawer can't dodge the rail
     stop_frac: float = 2 / 3
 
     # Dividers
     div_t: float = 1.4
-    rib: float = 1.0
-    rib_w: float = 1.2
-    div_slot: float = 1.8
+    rib: float = 3.0  # deep enough to hold a divider upright
+    rib_w: float = 1.6
+    div_slot: float = 1.75  # 0.18 mm each side of the divider
     div_xs: tuple = (-45.0, 0.0, 45.0)  # from the drawer's centre
+
+    # The drawer's shape, recessed in its front left of the handle
+    face_size: float = 24.0
 
     # Decoration and feet
     decor_depth: float = 0.6
@@ -238,6 +241,11 @@ def side_play(p=P):
     return p.guide
 
 
+def stop_catch(p=P):
+    """How far the nub overlaps the rail."""
+    return p.rail_out + p.nub_out - p.gap_left
+
+
 def stop_y(p=P):
     """Back end of the stop rail."""
     return nub_front_y(p) - travel_stop(p)
@@ -247,7 +255,7 @@ def slot(p=P):
     """The opening in the top the rod goes in by: x0, x1, y0, y1."""
     x, y = rod_xy(p)
     r = p.bore_r + p.tube_wall + 0.3
-    return drawer_box(p)[1], x + r, y - r, y + r
+    return x - p.cam_r - 0.5, x + r, y - r, y + r
 
 
 def fork_zs(p=P):
@@ -419,7 +427,7 @@ def ledges(p=P):
             right = right.cut(fork_notch(z, p))
         out.append(right)
         g = x1 + p.guide
-        out.append(box(g, g + 1.2, fin_y(p) + 1.0, y1 + 0.1, z + p.ledge_t - 0.1, z + p.ledge_t + 1.5))
+        out.append(box(g, g + 1.2, pocket_y(p)[1] + 1.0, y1 + 0.1, z + p.ledge_t - 0.1, z + p.ledge_t + 1.5))
     return out
 
 
@@ -570,19 +578,57 @@ def handle_grip(i, p=P):
     return -x, x, zt - p.bar_h, zt, yb
 
 
-def fin(i, p=P):
-    """Along the outside of the right wall, behind the cam's notch: the tab
-    the locked cam holds, and the side an open drawer's cam rests on."""
-    x1, y1 = drawer_box(p)[1], drawer_box(p)[3]
-    z = drawer_z(i, p) + p.fin_z
-    pts = [(x1 - 0.1, z), (x1, z), (x1 + p.fin_reach, z + p.fin_reach), (x1 + p.fin_reach, z + p.fin_h), (x1 - 0.1, z + p.fin_h)]
-    return xz_prism(pts, fin_y(p), y1)
+def cam_outline(angle, p=P, n=24):
+    """Points round a cam's outline, seen from above, at `angle`."""
+    x, y = rod_xy(p)
+    h, t = p.cam_w / 2, p.cam_r - p.cam_w / 2
+    pts = [(0, -h), (t, -h), (0, h), (t, h)] + [(t + h * math.cos(math.radians(a)), h * math.sin(math.radians(a))) for a in range(-90, 91, 180 // n)]
+    return [(x + px * math.cos(math.radians(angle)) - py * math.sin(math.radians(angle)), y + px * math.sin(math.radians(angle)) + py * math.cos(math.radians(angle))) for px, py in pts]
 
 
-def fin_y(p=P):
-    """Front of the fin: the cam's notch is ahead of it, long enough for the
-    cam to swing back to unlocked past the fin's edge."""
-    return p.rod_y + math.sqrt(p.cam_r ** 2 - (p.rod_dx - p.fin_reach) ** 2) + p.lock_clr
+def pocket_y(p=P):
+    """Front and back of the pocket: room for the cam to swing in from
+    unlocked, and no more, so a locked drawer is caught after a few mm."""
+    x1 = drawer_box(p)[1]
+    inside = [py for a in range(UNLOCKED, LOCKED + 1) for px, py in cam_outline(a, p) if px <= x1 + p.pocket_clr]
+    return min(inside) - p.pocket_clr, max(inside) + p.pocket_clr
+
+
+def pocket(i, p=P):
+    """The pocket the cam reaches into, with a 45 degree roof so it prints."""
+    x, _ = rod_xy(p)
+    x1 = drawer_box(p)[1]
+    y0, y1 = pocket_y(p)
+    z0, z1 = cam_span(i, p)
+    z0, z1 = z0 - p.pocket_clr, z1 + p.pocket_clr
+    pts = [(y0, z0), (y1, z0), (y1, z1), ((y0 + y1) / 2, z1 + (y1 - y0) / 2), (y0, z1)]
+    return yz_prism(pts, x - p.cam_r - p.pocket_clr, x1 + 0.1)
+
+
+def pocket_post(i, p=P):
+    """Solid corner post inside the drawer that the pocket is cut into."""
+    x, _ = rod_xy(p)
+    x1 = drawer_box(p)[1]
+    y1 = pocket_y(p)[1]
+    z0, z1 = cam_span(i, p)
+    top = z1 + p.pocket_clr + (y1 - pocket_y(p)[0]) / 2 + p.post_wall
+    return box(x - p.cam_r - p.pocket_clr - p.post_wall, x1 - 0.1, -0.1, y1 + p.post_wall, drawer_z(i, p) + 0.1, top)
+
+
+def face_shape(i, p=P):
+    """The drawer's shape, recessed 0.6 mm into its front left of the handle,
+    with 45 degree sides."""
+    cx = (-(p.width - p.front_gap) / 2 - p.handle_w / 2) / 2
+    cz = front_mid(i, p)
+    y_out = -p.front_t
+    pts = shape_pts(SHAPES[i], p.face_size)
+
+    def wire(y, d):
+        if pts is None:
+            return cq.Wire.makeCircle(p.face_size / 2 + d, cq.Vector(cx, y, cz), cq.Vector(0, 1, 0))
+        return cq.Wire.makePolygon([cq.Vector(cx + u, y, cz + v) for u, v in grow(pts, d)], close=True)
+
+    return cq.Workplane(obj=cq.Solid.makeLoft([wire(y_out - 0.1, 0.1), wire(y_out + p.decor_depth, -p.decor_depth)], True))
 
 
 def stop_nub(i, p=P, shift=0.0):
@@ -624,9 +670,9 @@ def make_drawer(i, p=P, pressed=False):
         leaf = box(x0, x0 + p.wall, ly0, ly1, z + h - p.leaf_len, z + h)
         d = d.cut(leaf).union(leaf.translate((p.nub_out + 0.2, 0, 0)))
         nub = nub.translate((p.nub_out + 0.2, 0, 0))
-    for part in [front_plate(i, p), handle(i, p), fin(i, p), nub] + div_ribs(i, p):
+    for part in [front_plate(i, p), handle(i, p), pocket_post(i, p), nub] + div_ribs(i, p):
         d = d.union(part)
-    return d
+    return d.cut(pocket(i, p)).cut(face_shape(i, p))
 
 
 def drawer_at(i, t, p=P, pressed=False):

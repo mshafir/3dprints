@@ -35,15 +35,14 @@ def test_outside_fits_shelf_and_bed():
 
 def test_inside_holds_a_pencil():
     w, l, h = cd.inside()
-    assert l >= 180.0 and w >= 178.0 and h >= 50.0
+    assert l >= 180.0 and w >= 175.0 and h >= 50.0
 
 
 def test_lock_geometry_numbers():
     x, y = cd.rod_xy()
     x1 = cd.drawer_box()[1]
-    assert x - P.cam_r - x1 == pytest.approx(P.lock_clr)  # locked cam tip clear of the wall
-    assert x - P.cam_w / 2 - (x1 + P.fin_reach) >= 1.5  # unlocked cam clear of the fin
-    assert y - P.cam_r - P.stile >= 1.5  # unlocked cam clear of the stile
+    assert x1 - (x - P.cam_r) >= 2.5  # locked, the cam reaches well into the drawer's pocket
+    assert x - P.cam_w / 2 - x1 >= 1.5  # unlocked, it points back, clear of the drawer
 
 
 def test_travel_stop():
@@ -126,9 +125,23 @@ def test_stop_holds_and_releases(frame):
         assert overlap(frame, cd.drawer_at(1, t, pressed=True)) < EPS
 
 
-def test_handles_all_the_same(drawers):
-    vols = [d.val().Volume() for d in drawers]
-    assert max(vols) - min(vols) < 1.0
+def test_handles_all_the_same():
+    vols = [cd.handle(i).val().Volume() for i in range(P.bays)]
+    assert max(vols) - min(vols) < 0.01
+
+
+def test_each_front_has_its_shape_left_of_the_handle(drawers):
+    post = -P.handle_w / 2
+    for i, d in enumerate(drawers):
+        cut = cd.face_shape(i)
+        assert overlap(d, cut) < EPS  # recessed
+        assert overlap(cd.front_plate(i), cut) > EPS  # into the front
+        bb = cut.val().BoundingBox()
+        assert bb.xmax < post - 3 and bb.xmin > -P.width / 2 + 3
+
+
+def test_divider_ribs_hold():
+    assert P.rib >= 3.0 and P.div_slot - P.div_t <= 0.4
 
 
 def test_handle_fits_a_hand(drawers):
@@ -174,7 +187,7 @@ def test_locked_holds_every_drawer(frame, drawers, rod_locked):
     assert overlap(frame, rod_locked) < EPS
     for i in range(P.bays):
         assert overlap(rod_locked, drawers[i]) < EPS
-        assert overlap(rod_locked, cd.drawer_at(i, 5.0)) > EPS  # opens a few mm, then held
+        assert overlap(rod_locked, cd.drawer_at(i, 6.0)) > EPS  # opens about 5 mm, then held
 
 
 @pytest.mark.parametrize("t", [1, 2, 5, 40, 120])
@@ -334,3 +347,37 @@ def test_top_drawer_clear_of_screw_bosses():
 def test_rod_stays_in_floor_socket_at_full_lift():
     lift = cd.badge_tube_bottom() - cd.flange_top() + 0.3  # it rests 0.3 lower than modelled
     assert P.pin_depth - lift >= 2.0
+
+
+
+# --- Locking, as a pull would test it ---------------------------------------
+
+
+def test_no_fin_on_the_drawer_side():
+    # the drawer's own wall blocks the turn; nothing stands proud of it
+    x1 = cd.drawer_box()[1]
+    beside = cd.box(x1 + 0.05, x1 + 10, 0, cd.drawer_box()[3], 0, P.height)
+    assert overlap(cd.make_drawer(1), beside) < EPS
+
+
+def test_locked_drawer_is_caught_within_8_mm(rod_locked):
+    for i in range(P.bays):
+        assert overlap(rod_locked, cd.drawer_at(i, 8.0)) > EPS
+
+
+@pytest.mark.parametrize("a", [0, 5, 10, 15, 20])
+def test_locked_drawer_stays_caught_as_the_rod_twists(a):
+    # a pull turns the rod counter-clockwise into its stop (about 10 degrees)
+    # and the rod twists a little more along its length under a hard yank
+    rod = cd.make_rod(cd.LOCKED + a)
+    for t in (8.0, 15.0, 40.0):
+        assert overlap(rod, cd.drawer_at(0, t)) > EPS
+
+
+def test_stop_halts_the_rod_before_the_cam_lets_go(badge):
+    assert overlap(badge, cd.make_rod(cd.LOCKED + 12)) > EPS
+
+
+def test_back_stop_catch_is_deep():
+    assert cd.stop_catch() >= 2.5
+    assert cd.stop_catch() - cd.side_play() >= 2.0
