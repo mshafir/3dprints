@@ -101,7 +101,7 @@ class Params:
     badge_x: tuple = (76.0, 101.0)
     badge_y: tuple = (-1.0, 33.0)
     badge_chamfer: float = 1.0
-    screws: tuple = ((88.0, 3.0), (95.0, 27.5))
+    screws: tuple = ((87.5, 27.5), (97.0, 27.5))  # behind the tube, clear of the icons
     screw_pilot: float = 2.6
     screw_clear: float = 3.4
     cbore_r: float = 3.25
@@ -133,6 +133,14 @@ class Params:
     bump_r: float = 6.0
     bump_d: float = 0.8
     bump_inset: float = 15.0
+
+    # Icons and the key's pointer: V-grooves, which print on the bed face
+    groove: float = 0.6  # deep, 45 degree sides
+
+    # Key
+    key_size: float = 36.0
+    key_grip: float = 4.0
+    key_hole_r: float = 2.5
 
     bed: float = 250.0  # largest part either way; the P1S bed is 256
 
@@ -616,3 +624,166 @@ def divider_in(i, slot, p=P):
 
 def divider_print(part, p=P):
     return part.rotate((0, 0, 0), (0, 1, 0), 90).translate((0, 0, p.div_t / 2))
+
+
+# --- Lock ---------------------------------------------------------------------
+
+
+def mouth_z(p=P):
+    """Top of the rod head, where the socket opens."""
+    return p.height + p.badge_t - p.key_depth
+
+
+def rod_flat(p=P):
+    """The rod prints lying on a flat on the side away from its cams, as far
+    out as the head can be cut without an underside flatter than 45 degrees."""
+    return p.head_r * math.sqrt(0.5)
+
+
+def rod_body(r, z0, z1, p=P):
+    """Round rod, with a 45 degree keel out to the flat on the side away from
+    the cams (-x, before turning). The keel fits inside the forks and the
+    floor socket at every angle the rod turns through."""
+    f = rod_flat(p)
+    k = r * math.sqrt(0.5)
+    keel = [(-k, k), (-f, r * math.sqrt(2) - f), (-f, f - r * math.sqrt(2)), (-k, -k), (0, 0)]
+    return cyl(r, z0, z1).union(prism(keel, z0, z1))
+
+
+def socket(p=P, grow_by=0.0):
+    """Three lobes round a hub, the first lobe toward the cams."""
+    z0, z1 = mouth_z(p) - p.socket_depth, mouth_z(p) + 0.1
+    s = cyl(p.hub_r + grow_by, z0, z1)
+    for a in (0, 120, 240):
+        c = p.lobe_at * math.cos(math.radians(a)), p.lobe_at * math.sin(math.radians(a))
+        s = s.union(cyl(p.lobe_r + grow_by, z0, z1, *c))
+    return s
+
+
+def notch_angles(p=P):
+    """Notch directions on the head, from the cam direction, where the nub
+    (fixed at -y) sits when locked and when unlocked."""
+    return [270 - LOCKED, 270 - UNLOCKED]
+
+
+def make_rod(angle, p=P):
+    """The lock rod in place, cams pointing at `angle`."""
+    z0 = p.cap + p.boss_h - p.pin_depth + 0.3
+    zm = mouth_z(p)
+    zh = zm - p.head_len
+    rod = rod_body(p.rod_r, z0, zh - p.flange_t, p)
+    rod = rod.union(cyl(p.flange_r, zh - p.flange_t, zh)).union(cyl(p.head_r, zh, zm))
+    for i in range(p.bays):
+        c0, c1 = cam_span(i, p)
+        tip = p.cam_r - p.cam_w / 2
+        rod = rod.union(box(0, tip, -p.cam_w / 2, p.cam_w / 2, c0, c1)).union(cyl(p.cam_w / 2, c0, c1, tip, 0))
+    notch_c = p.head_r + p.notch_r - (p.det_press + 0.1)
+    notches = [cyl(p.notch_r, zh - 0.1, zm + 0.1, notch_c * math.cos(math.radians(a)), notch_c * math.sin(math.radians(a))) for a in notch_angles(p)]
+    f = rod_flat(p)
+    rod = cut_all(rod, [socket(p)] + notches).cut(box(-20, -f, -20, 20, 0, p.height + 10))
+    return turn(rod, angle).translate((*rod_xy(p), 0))
+
+
+def rod_print(part, angle=LOCKED, p=P):
+    """Lying on its flat, cams up."""
+    x, y = rod_xy(p)
+    local = turn(part.translate((-x, -y, 0)), -angle)
+    return local.rotate((0, 0, 0), (0, 1, 0), -90).translate((0, 0, rod_flat(p)))
+
+
+def rod_bridges(angle=LOCKED, p=P):
+    """The socket, a hole in the rod's end only 2 to 3 mm across: its roof
+    bridges when the rod prints lying down."""
+    return turn(socket(p, 0.2), angle).translate((*rod_xy(p), 0))
+
+
+def groove(a, b, top, p=P):
+    """V-groove from a to b in a face at height `top`, opening upward."""
+    (ax, ay), (bx, by) = a, b
+    length = math.hypot(bx - ax, by - ay)
+    w = p.groove + 0.1
+    v = yz_prism([(-w, top + 0.1), (w, top + 0.1), (0, top - p.groove)], -p.groove, length + p.groove)
+    return turn(v, math.degrees(math.atan2(by - ay, bx - ax))).translate((ax, ay, 0))
+
+
+def padlock(cx, cy, top, closed, p=P, flip=False):
+    """Padlock outline as grooves, 5 x 4 body, shackle toward +y. `flip`
+    mirrors it for a face seen from below."""
+    pts = [(-2.5, -2.5), (2.5, -2.5), (2.5, 1.5), (-2.5, 1.5)]
+    segs = list(zip(pts, pts[1:] + pts[:1]))
+    lift = 0.0 if closed else 1.5
+    segs += [((-1.5, 1.5 + lift), (-1.5, 4.0 + lift)), ((-1.5, 4.0 + lift), (1.5, 4.0 + lift)), ((1.5, 4.0 + lift), (1.5, 1.5 + (0 if closed else 2.5)))]
+    s = -1 if flip else 1
+    return [groove((cx + s * ax, cy + ay), (cx + s * bx, cy + by), top, p) for (ax, ay), (bx, by) in segs]
+
+
+def badge_tube_bottom(p=P):
+    return mouth_z(p) - 2.0
+
+
+def make_badge(p=P):
+    """The lock badge in place on top: plate, keyhole tube and detent leaf."""
+    x, y = rod_xy(p)
+    top = p.height + p.badge_t
+    (bx0, bx1), (by0, by1) = p.badge_x, p.badge_y
+    plate = box(bx0, bx1, by0, by1, p.height, top).edges("|Z").fillet(3.0).faces(">Z").edges().chamfer(p.badge_chamfer)
+    ro = p.bore_r + p.tube_wall
+    zt = badge_tube_bottom(p)
+    b = plate.union(cyl(ro, zt, p.height + 0.1, x, y))
+    # Leaf: two slits in the tube wall at -y, free at the bottom
+    slits = [box(sx, sx + 0.5, y - ro - 0.1, y - p.bore_r + 0.1, zt - 0.1, p.height - p.cap) for sx in (x - p.det_w / 2 - 0.5, x + p.det_w / 2)]
+    holes = [cyl(p.bore_r, zt - 0.1, top + 0.1, x, y)] + slits
+    for sx, sy in p.screws:
+        holes += [cyl(p.screw_clear / 2, p.height - 0.1, top + 0.1, sx, sy), cyl(p.cbore_r, top - p.cbore_d, top + 0.1, sx, sy)]
+    b = cut_all(b, holes)
+    b = b.union(cyl(p.nub_r, zt, mouth_z(p), x, y - p.bore_r))
+    r = 9.5
+    icons = padlock(x - r, y, top, True, p) + padlock(x, y - r + 1.0, top, False, p)
+    for g in icons:
+        b = b.cut(g)
+    return b
+
+
+def badge_print(part, p=P):
+    """Top face down, tube up."""
+    return part.rotate((0, 0, 0), (1, 0, 0), 180).translate((0, 0, p.height + p.badge_t))
+
+
+def covers(part, x0, x1, y0, y1, z, holes=()):
+    """True when the part's section at height z covers the rectangle, apart
+    from the `holes`."""
+    slab = cut_all(box(x0, x1, y0, y1, z - 0.05, z + 0.05), list(holes)).cut(part)
+    return slab.val().Volume() < 0.01
+
+
+def make_key(angle, p=P):
+    """The key in place, seated in the socket, its pointer at `angle`."""
+    zm = mouth_z(p)
+    top = p.height + p.badge_t + 1.0
+    tip = socket(p, -p.key_clr).cut(box(-10, 10, -10, 10, zm - 20, zm - p.socket_depth + 0.2)).cut(box(-10, 10, -10, 10, zm + 0.1, zm + 10))
+    shaft = cyl(p.bore_r - 0.4, zm + 0.1, top + 0.1).union(cyl(p.hub_r - p.key_clr, zm - 0.1, zm + 0.2))
+    star = [(u, v) for u, v in (turn_pt(pt, -90) for pt in shape_pts("star", p.key_size))]
+    grip = prism(star, top, top + p.key_grip)
+    hc = 9.0 * math.cos(math.radians(180)), 9.0 * math.sin(math.radians(180))
+    key = tip.union(shaft).union(grip).cut(cyl(p.key_hole_r, top - 0.1, top + p.key_grip + 0.1, *hc))
+    for g in [groove((4.0, 0.0), (13.0, 0.0), top + p.key_grip, p), groove((13.0, 0.0), (10.0, 2.5), top + p.key_grip, p), groove((13.0, 0.0), (10.0, -2.5), top + p.key_grip, p)]:
+        key = key.cut(g)
+    return turn(key, angle).translate((*rod_xy(p), 0))
+
+
+def turn_pt(pt, deg):
+    a = math.radians(deg)
+    return pt[0] * math.cos(a) - pt[1] * math.sin(a), pt[0] * math.sin(a) + pt[1] * math.cos(a)
+
+
+def key_print(part, p=P):
+    """Grip down, pointer groove on the bed face."""
+    return part.rotate((0, 0, 0), (1, 0, 0), 180).translate((0, 0, p.height + p.badge_t + 1.0 + p.key_grip))
+
+
+def hex_key(af, angle, p=P):
+    """A hex key `af` across flats, standing in the socket at the rod axis."""
+    r = af / math.sqrt(3)
+    pts = [turn_pt((r, 0), 60 * k + angle) for k in range(6)]
+    zm = mouth_z(p)
+    return prism(pts, zm - p.socket_depth + 0.1, zm + 10).translate((*rod_xy(p), 0))

@@ -140,3 +140,109 @@ def test_drawer_and_divider_print(drawers):
         assert max(size(part)) <= P.bed
         assert cd.overhang_area(part) < 5.0
     assert cd.overhang_area(cd.divider_print(cd.make_divider())) < 1.0
+
+
+# --- Lock -------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def rod_locked():
+    return cd.make_rod(cd.LOCKED)
+
+
+@pytest.fixture(scope="module")
+def rod_unlocked():
+    return cd.make_rod(cd.UNLOCKED)
+
+
+@pytest.fixture(scope="module")
+def badge():
+    return cd.make_badge()
+
+
+def test_locked_holds_every_drawer(frame, drawers, rod_locked):
+    assert overlap(frame, rod_locked) < EPS
+    for i in range(P.bays):
+        assert overlap(rod_locked, drawers[i]) < EPS
+        assert overlap(rod_locked, cd.drawer_at(i, 1.0)) > EPS
+
+
+@pytest.mark.parametrize("t", [1, 2, 5, 40, 120])
+def test_open_drawer_blocks_locking(rod_locked, t):
+    assert overlap(rod_locked, cd.drawer_at(2, t)) > EPS
+
+
+def test_unlocked_frees_every_drawer(frame, rod_unlocked):
+    assert overlap(frame, rod_unlocked) < EPS
+    for i in range(P.bays):
+        for t in (0, 60, 120):
+            assert overlap(rod_unlocked, cd.drawer_at(i, t)) < EPS
+
+
+def test_turn_is_clear_with_drawers_shut(frame, drawers):
+    for a in range(180, 271, 10):
+        rod = cd.make_rod(a)
+        assert overlap(frame, rod) < EPS
+        assert all(overlap(rod, d) < EPS for d in drawers)
+
+
+def test_reinserting_while_locked_stops_short(rod_locked, rod_unlocked):
+    assert overlap(rod_locked, cd.drawer_at(0, 17.0)) > EPS  # tab meets the cam
+    assert overlap(rod_unlocked, cd.drawer_at(0, 17.0)) < EPS
+
+
+def test_rod_drops_in_only_at_insertion_angle(frame, rod_locked, rod_unlocked):
+    for dz in range(0, 260, 10):
+        assert overlap(frame, rod_locked.translate((0, 0, dz))) < EPS
+    dz = cd.pitch() - P.cam_z - P.cam_h / 2 - P.ledge_t / 2  # cams level with the forks above
+    assert overlap(frame, rod_unlocked.translate((0, 0, dz))) > EPS
+
+
+def test_badge_covers_slot_and_seats(frame, badge, rod_locked):
+    assert overlap(frame, badge) < EPS
+    assert overlap(badge, rod_locked) < EPS  # the nub rests in a notch
+    bore = cd.cyl(P.bore_r, 0, 300, *cd.rod_xy())  # the keyhole: sealed by the rod head
+    assert cd.covers(badge, *cd.slot(), z=P.height + 0.5, holes=[bore])
+
+
+def test_detent_presses_between_positions(badge, rod_unlocked):
+    assert overlap(badge, rod_unlocked) < EPS
+    assert overlap(badge, cd.make_rod(225)) > EPS
+
+
+def test_rod_cannot_lift_out_of_its_socket(badge, rod_locked):
+    lift = P.pin_depth - 0.5
+    assert overlap(badge, rod_locked.translate((0, 0, lift))) > EPS
+
+
+def test_key_fits_and_drives(rod_locked):
+    assert overlap(rod_locked, cd.make_key(cd.LOCKED)) < EPS
+    assert overlap(rod_locked, cd.make_key(cd.LOCKED + 5)) > EPS
+
+
+def test_key_clears_badge(badge):
+    assert overlap(badge, cd.make_key(cd.LOCKED)) < EPS
+
+
+def test_keyhole_depth_and_seal(rod_locked):
+    assert P.key_depth >= 15.0 and 2 * P.bore_r < 17.0  # no fingertip, no coin
+    pencil = cd.cyl(3.6, 200, 260, *cd.rod_xy())
+    assert overlap(pencil, rod_locked) > EPS  # stops on the head
+
+
+@pytest.mark.parametrize("af", [2.5, 3.0, 4.0, 5.0, 6.0])
+def test_hex_keys_do_not_drive(rod_locked, af):
+    hits = [overlap(rod_locked, cd.hex_key(af, a)) > EPS for a in range(0, 60, 5)]
+    assert all(hits) or not any(hits)
+
+
+def test_lock_parts_print(rod_locked, badge):
+    parts = [
+        (cd.rod_print(rod_locked), [cd.rod_print(cd.rod_bridges())]),
+        (cd.badge_print(badge), []),
+        (cd.key_print(cd.make_key(cd.LOCKED)), []),
+    ]
+    for part, allow in parts:
+        assert len(part.solids().vals()) == 1
+        assert max(size(part)) <= P.bed
+        assert cd.overhang_area(part, allow=allow) < 5.0
