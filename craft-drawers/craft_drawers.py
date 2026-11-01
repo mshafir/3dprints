@@ -18,7 +18,9 @@ from pathlib import Path
 import cadquery as cq
 
 LOCKED = 180  # cams point -x, at the drawers' tabs
-UNLOCKED = 270  # cams point forward, clear of the tabs
+UNLOCKED = 90  # cams point back, clear of the tabs: unlocking turns clockwise,
+# so a pull on a locked drawer, which turns the cams counter-clockwise, drives
+# the rod into its stop instead of toward unlocked
 SHAPES = ("circle", "triangle", "square", "star")  # pulls, bottom drawer up
 
 
@@ -69,7 +71,7 @@ class Params:
     fin_z: float = 20.0  # fin bottom above the drawer's underside; 45 degree chamfer to fin_z + 4
     fin_h: float = 10.0
     lock_clr: float = 0.5
-    fork_clr: float = 0.3
+    fork_clr: float = 0.55  # round the rod's keel corners, which reach 3.7 mm
 
     # Rod head, under the keyhole tube in the badge
     head_r: float = 4.7
@@ -81,14 +83,24 @@ class Params:
     tube_len: float = 16.0
     socket_depth: float = 5.0
     key_depth: float = 17.0  # badge top to the socket mouth: past a fingertip
-    pin_depth: float = 4.0
-    boss_h: float = 4.0  # floor boss holding the rod's foot
+    pin_depth: float = 6.0  # still 2.7 mm in when the rod is lifted to the tube
+    boss_h: float = 6.0  # floor boss holding the rod's foot
 
-    # Socket: three lobes round a hub
+    # Stop: a lug on the rod below the badge's tube meets a tooth hanging from
+    # the tube just past locked
+    lug_r: float = 7.0
+    lug_w: float = 3.0
+    lug_h: float = 3.0
+    tooth_r: tuple = (5.8, 7.3)
+    tooth_a: tuple = (200.0, 224.0)  # degrees, absolute
+
+    # Socket: three lobes round a hub, turned to keep clear of the detent
+    # notches and the print flat
     hub_r: float = 1.5
-    lobe_r: float = 1.0
-    lobe_at: float = 2.2
-    key_clr: float = 0.15
+    lobe_r: float = 0.95
+    lobe_at: float = 1.9
+    lobe_a: tuple = (100.0, 220.0, 340.0)  # from the cam direction
+    key_clr: float = 0.25  # the socket prints on its side
 
     # Detent: a leaf in the tube wall presses a nub into notches in the head
     det_press: float = 0.7
@@ -99,9 +111,9 @@ class Params:
     # Lock badge on top, over the slot the rod goes in by
     badge_t: float = 3.0
     badge_x: tuple = (76.0, 101.0)
-    badge_y: tuple = (-1.0, 33.0)
+    badge_y: tuple = (-1.0, 37.0)
     badge_chamfer: float = 1.0
-    screws: tuple = ((87.5, 27.5), (97.0, 27.5))  # behind the tube, clear of the icons
+    screws: tuple = ((88.0, 31.5), (96.5, 31.5))  # behind the tube and the icons, clear of the top drawer
     screw_pilot: float = 2.6
     screw_clear: float = 3.4
     cbore_r: float = 3.25
@@ -111,13 +123,15 @@ class Params:
 
     # Drawer stop: a leaf in the drawer's left wall carries a nub that meets
     # the back end of a rail on the frame's left wall
-    leaf_w: float = 10.0
+    leaf_w: float = 20.0  # wide and short, to take a yank
+    leaf_len: float = 26.0  # springs from this far below the wall top
     leaf_slit: float = 0.6
     leaf_back: float = 4.0  # leaf's back edge ahead of the inside of the drawer's back wall
-    nub_out: float = 1.2
+    nub_out: float = 1.5
     nub_h: float = 6.0
     nub_top: float = 4.0  # nub top below the wall top
-    rail_out: float = 1.5
+    rail_out: float = 1.6
+    guide: float = 0.5  # play to a rib on the right ledge, so a drawer can't dodge the rail
     stop_frac: float = 2 / 3
 
     # Dividers
@@ -212,6 +226,11 @@ def nub_front_y(p=P):
 def nub_z(i, p=P):
     top = drawer_z(i, p) + drawer_box(p)[4] - p.nub_top
     return top - p.nub_h, top
+
+
+def side_play(p=P):
+    """How far a drawer can shift toward the lock side, to the guide rib."""
+    return p.guide
 
 
 def stop_y(p=P):
@@ -394,6 +413,8 @@ def ledges(p=P):
         if i > 0:
             right = right.cut(fork_notch(z, p))
         out.append(right)
+        g = x1 + p.guide
+        out.append(box(g, g + 1.2, fin_y(p) + 1.0, y1 + 0.1, z + p.ledge_t - 0.1, z + p.ledge_t + 1.5))
     return out
 
 
@@ -552,8 +573,9 @@ def fin(i, p=P):
 
 
 def fin_y(p=P):
-    """Front of the fin: the cam's notch is ahead of it."""
-    return p.rod_y + p.cam_w / 2 + p.lock_clr
+    """Front of the fin: the cam's notch is ahead of it, long enough for the
+    cam to swing back to unlocked past the fin's edge."""
+    return p.rod_y + math.sqrt(p.cam_r ** 2 - (p.rod_dx - p.fin_reach) ** 2) + p.lock_clr
 
 
 def stop_nub(i, p=P, shift=0.0):
@@ -588,11 +610,11 @@ def make_drawer(i, p=P, pressed=False):
     z = drawer_z(i, p)
     d = box(x0, x1, y0, y1, z, z + h).cut(box(x0 + p.wall, x1 - p.wall, y0 - 0.1, y1 - p.wall, z + p.floor, z + h + 0.1))
     ly0, ly1 = leaf_y(p)
-    slits = [box(x0 - 0.1, x0 + p.wall + 0.1, y, y + p.leaf_slit, z + p.floor, z + h + 0.1) for y in (ly0 - p.leaf_slit, ly1)]
+    slits = [box(x0 - 0.1, x0 + p.wall + 0.1, y, y + p.leaf_slit, z + h - p.leaf_len, z + h + 0.1) for y in (ly0 - p.leaf_slit, ly1)]
     d = cut_all(d, slits)
     nub = stop_nub(i, p)
     if pressed:
-        leaf = box(x0, x0 + p.wall, ly0, ly1, z + p.floor, z + h)
+        leaf = box(x0, x0 + p.wall, ly0, ly1, z + h - p.leaf_len, z + h)
         d = d.cut(leaf).union(leaf.translate((p.nub_out + 0.2, 0, 0)))
         nub = nub.translate((p.nub_out + 0.2, 0, 0))
     for part in [front_plate(i, p), pull(i, p), fin(i, p), nub] + div_ribs(i, p):
@@ -651,10 +673,10 @@ def rod_body(r, z0, z1, p=P):
 
 
 def socket(p=P, grow_by=0.0):
-    """Three lobes round a hub, the first lobe toward the cams."""
+    """Three lobes round a hub, at `lobe_a` from the cam direction."""
     z0, z1 = mouth_z(p) - p.socket_depth, mouth_z(p) + 0.1
     s = cyl(p.hub_r + grow_by, z0, z1)
-    for a in (0, 120, 240):
+    for a in p.lobe_a:
         c = p.lobe_at * math.cos(math.radians(a)), p.lobe_at * math.sin(math.radians(a))
         s = s.union(cyl(p.lobe_r + grow_by, z0, z1, *c))
     return s
@@ -662,8 +684,8 @@ def socket(p=P, grow_by=0.0):
 
 def notch_angles(p=P):
     """Notch directions on the head, from the cam direction, where the nub
-    (fixed at -y) sits when locked and when unlocked."""
-    return [270 - LOCKED, 270 - UNLOCKED]
+    (fixed at +y) sits when locked and when unlocked."""
+    return [(90 - LOCKED) % 360, (90 - UNLOCKED) % 360]
 
 
 def make_rod(angle, p=P):
@@ -673,6 +695,7 @@ def make_rod(angle, p=P):
     zh = zm - p.head_len
     rod = rod_body(p.rod_r, z0, zh - p.flange_t, p)
     rod = rod.union(cyl(p.flange_r, zh - p.flange_t, zh)).union(cyl(p.head_r, zh, zm))
+    rod = rod.union(box(0, p.lug_r, -p.lug_w / 2, p.lug_w / 2, zh - p.lug_h, zh))
     for i in range(p.bays):
         c0, c1 = cam_span(i, p)
         tip = p.cam_r - p.cam_w / 2
@@ -682,6 +705,29 @@ def make_rod(angle, p=P):
     f = rod_flat(p)
     rod = cut_all(rod, [socket(p)] + notches).cut(box(-20, -f, -20, 20, 0, p.height + 10))
     return turn(rod, angle).translate((*rod_xy(p), 0))
+
+
+def flange_top(p=P):
+    return mouth_z(p) - p.head_len
+
+
+def rod_reach(p=P):
+    """Farthest the rod's body reaches from its axis: the keel's corners."""
+    f = rod_flat(p)
+    return math.hypot(f, p.rod_r * math.sqrt(2) - f)
+
+
+def socket_wall(p=P):
+    """Thinnest wall between a socket lobe and a detent notch or the flat."""
+    nc = p.head_r + p.notch_r - (p.det_press + 0.1)
+    walls = []
+    for a in p.lobe_a:
+        lx, ly = p.lobe_at * math.cos(math.radians(a)), p.lobe_at * math.sin(math.radians(a))
+        walls.append(lx - p.lobe_r + rod_flat(p))
+        for n in notch_angles(p):
+            nx, ny = nc * math.cos(math.radians(n)), nc * math.sin(math.radians(n))
+            walls.append(math.hypot(lx - nx, ly - ny) - p.lobe_r - p.notch_r)
+    return min(walls)
 
 
 def rod_print(part, angle=LOCKED, p=P):
@@ -730,18 +776,38 @@ def make_badge(p=P):
     ro = p.bore_r + p.tube_wall
     zt = badge_tube_bottom(p)
     b = plate.union(cyl(ro, zt, p.height + 0.1, x, y))
-    # Leaf: two slits in the tube wall at -y, free at the bottom
-    slits = [box(sx, sx + 0.5, y - ro - 0.1, y - p.bore_r + 0.1, zt - 0.1, p.height - p.cap) for sx in (x - p.det_w / 2 - 0.5, x + p.det_w / 2)]
-    holes = [cyl(p.bore_r, zt - 0.1, top + 0.1, x, y)] + slits
+    # Leaf: two slits in the tube wall at +y, free at the bottom, cut well
+    # into the bore so no web joins the leaf to the tube
+    slits = [box(sx, sx + 0.6, y + p.bore_r - 1.0, y + ro + 0.1, zt - 0.1, p.height - p.cap) for sx in (x - p.det_w / 2 - 0.6, x + p.det_w / 2)]
+    holes = [cyl(p.bore_r, zt - 0.1, top + 0.1, x, y)]
     for sx, sy in p.screws:
-        holes += [cyl(p.screw_clear / 2, p.height - 0.1, top + 0.1, sx, sy), cyl(p.cbore_r, top - p.cbore_d, top + 0.1, sx, sy)]
-    b = cut_all(b, holes)
-    b = b.union(cyl(p.nub_r, zt, mouth_z(p), x, y - p.bore_r))
+        holes += [cyl(p.screw_clear / 2, p.height - 0.1, top + 0.1, sx, sy).union(cyl(p.cbore_r, top - p.cbore_d, top + 0.1, sx, sy))]
+    b = cut_all(cut_all(b, holes), slits)  # the slits run into the bore
+    b = b.union(cyl(p.nub_r, zt, mouth_z(p), x, y + p.bore_r))
+    b = b.union(tooth(p))
     r = 9.5
-    icons = padlock(x - r, y, top, True, p) + padlock(x, y - r + 1.0, top, False, p)
+    icons = padlock(x - r, y, top, True, p) + padlock(x, y + r - 2.0, top, False, p)
     for g in icons:
         b = b.cut(g)
     return b
+
+
+def tooth(p=P):
+    """Hangs from the tube just counter-clockwise of the lug at locked, so a
+    pull on a locked drawer cannot turn the rod."""
+    x, y = rod_xy(p)
+    (r0, r1), (a0, a1) = p.tooth_r, p.tooth_a
+    arc = [(r0, a0), (r1, a0), (r1, (a0 + a1) / 2), (r1, a1), (r0, a1), (r0, (a0 + a1) / 2)]
+    pts = [(x + r * math.cos(math.radians(a)), y + r * math.sin(math.radians(a))) for r, a in arc]
+    zt = badge_tube_bottom(p)
+    return prism(pts, flange_top(p) - p.lug_h, zt + 0.1)
+
+
+def badge_bridges(p=P):
+    """The counterbores' floors, rings round the screw holes: bridges when
+    the badge prints top down."""
+    top = p.height + p.badge_t
+    return [cyl(p.cbore_r + 0.2, top - p.cbore_d - 0.1, top - p.cbore_d + 0.1, sx, sy) for sx, sy in p.screws]
 
 
 def badge_print(part, p=P):

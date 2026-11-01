@@ -1,5 +1,30 @@
 # Craft drawers design
 
+## Revision 2 (2026-11-01, after the final review)
+
+This note supersedes Revision 1 and the body below where they differ. All of
+these are my calls, fixing problems the review found.
+
+- **The key unlocks by turning toward the back, not the front.** Locked,
+  the cams point at the drawers. Unlocked, they point back. A pull on a
+  locked drawer pushes the cam off-centre and twists the rod. That twist now
+  runs away from unlocked and into a hard stop: a lug on the rod meets a
+  tooth hanging from the badge's tube. Before this, a firm tug could swing
+  the rod open.
+- **A locked drawer opens about 4 mm before it is held.** The notch in the
+  fin has to be that long for the cam to swing back past it.
+- **The drawer stop is stronger.** The leaf is 20 mm wide and 26 mm long,
+  springing from partway up the wall. The bump catches the rail by 1.1 mm. A
+  low rib on each right ledge keeps the drawer from shifting more than
+  0.5 mm sideways, so it can't dodge the rail.
+- **Fit fixes:**
+  - The detent leaf's slits now cut it free.
+  - The rod has 0.35 mm clearance in its forks and floor socket.
+  - The key has 0.25 mm clearance in the socket.
+  - The socket's lobes are turned clear of the detent notches.
+  - The floor socket is 6 mm deep, so the rod can't lift out.
+  - The screws moved back, clear of the top drawer.
+
 ## Revision 1 (2026-11-01, while planning)
 
 This note supersedes the body below where they differ. All four are my
