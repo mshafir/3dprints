@@ -53,6 +53,7 @@ class Params:
     # Pulls
     pull_size: float = 34.0
     pull_proud: float = 14.0
+    pull_shears: int = 8
 
     # Lock: a rod behind the front post, with one cam per drawer. Locked, a
     # cam stands in a notch in its drawer's fin, ahead of the tab behind it.
@@ -308,6 +309,16 @@ def shape_on_side(name, u, v, size, x_out, inward, depth, extra=0.1):
     return wa.workplane(offset=x_far - x_in).polyline(b).close().loft(ruled=True)
 
 
+def xz_prism(pts, y0, y1):
+    """Prism of an (x, z) outline from y0 to y1."""
+    return prism(pts, -y1, -y0).rotate((0, 0, 0), (1, 0, 0), 90)
+
+
+def yz_prism(pts, x0, x1):
+    """Prism of a (y, z) outline from x0 to x1."""
+    return prism([(-z, y) for y, z in pts], x0, x1).rotate((0, 0, 0), (0, 1, 0), 90)
+
+
 def shape_pts(name, size):
     """Outline of a pull or decoration shape, centred on 0, about `size`
     across; None for the circle."""
@@ -321,7 +332,7 @@ def shape_pts(name, size):
         return [(r * math.cos(math.radians(90 + 120 * k)), r * math.sin(math.radians(90 + 120 * k)) - r * 0.25) for k in range(3)]
     if name == "star":
         r = size / 2
-        return [((r if k % 2 == 0 else 0.42 * r) * math.cos(math.radians(90 + 36 * k)), (r if k % 2 == 0 else 0.42 * r) * math.sin(math.radians(90 + 36 * k))) for k in range(10)]
+        return [((r if k % 2 == 0 else 0.5 * r) * math.cos(math.radians(90 + 36 * k)), (r if k % 2 == 0 else 0.5 * r) * math.sin(math.radians(90 + 36 * k))) for k in range(10)]
     raise ValueError(name)
 
 
@@ -484,3 +495,124 @@ def outside_openings(frame, p=P):
         "top": cut_all(box(-w + m, w - m, m, d - m, h - b, h - a), [top_slot(p)] + screw_holes(p)),
     }
     return [n for n, s in slabs.items() if s.cut(frame).val().Volume() > 0.01]
+
+
+# --- Drawers ------------------------------------------------------------------
+
+
+def front_plate(i, p=P):
+    """Covers the frame's edges round the opening. Its bottom is level with
+    the drawer's underside, so it prints on the bed with the drawer."""
+    z0 = drawer_z(i, p)
+    z1 = bay_z(i, p) + pitch(p) - p.front_gap / 2
+    w = p.width - p.front_gap
+    plate = box(-w / 2, w / 2, -p.front_t, 0, z0, z1)
+    plate = plate.edges("|Y and >Z").fillet(p.front_r)
+    return plate.edges("|Y and <Z").chamfer(1.0)
+
+
+def pull(i, p=P):
+    """The drawer's shape, standing proud of the plate. Every section is the
+    shape cut by itself raised by up to its depth, so no underside is flatter
+    than 45 degrees."""
+    cx = 0.0
+    cz = (drawer_z(i, p) + bay_z(i, p) + pitch(p) - p.front_gap / 2) / 2
+    y0, y1 = -p.front_t + 0.1, -p.front_t - p.pull_proud
+    pts = shape_pts(SHAPES[i], p.pull_size)
+
+    def wire(y, dz):
+        if pts is None:
+            return cq.Wire.makeCircle(p.pull_size / 2, cq.Vector(cx, y, cz + dz), cq.Vector(0, 1, 0))
+        return cq.Wire.makePolygon([cq.Vector(cx + u, y, cz + v + dz) for u, v in pts], close=True)
+
+    knob = cq.Workplane(obj=cq.Solid.makeLoft([wire(y0, 0), wire(y1, 0)], True))
+    # Several shears, so where one part of the shape sits over another (the
+    # star's arms) the upper part cannot reappear over the gap deeper in
+    for k in range(1, p.pull_shears + 1):
+        rise = (y0 - y1) * k / p.pull_shears
+        knob = knob.intersect(cq.Workplane(obj=cq.Solid.makeLoft([wire(y0, 0), wire(y1, rise)], True)))
+    return knob
+
+
+def fin(i, p=P):
+    """Along the outside of the right wall, behind the cam's notch: the tab
+    the locked cam holds, and the side an open drawer's cam rests on."""
+    x1, y1 = drawer_box(p)[1], drawer_box(p)[3]
+    z = drawer_z(i, p) + p.fin_z
+    pts = [(x1 - 0.1, z), (x1, z), (x1 + p.fin_reach, z + p.fin_reach), (x1 + p.fin_reach, z + p.fin_h), (x1 - 0.1, z + p.fin_h)]
+    return xz_prism(pts, fin_y(p), y1)
+
+
+def fin_y(p=P):
+    """Front of the fin: the cam's notch is ahead of it."""
+    return p.rod_y + p.cam_w / 2 + p.lock_clr
+
+
+def stop_nub(i, p=P, shift=0.0):
+    """On the outside of the stop leaf: square at the front, where it meets the
+    rail; ramped behind and underneath."""
+    x0 = drawer_box(p)[0] + shift
+    yf, yb = nub_front_y(p), leaf_y(p)[1] - 1.0
+    z0, z1 = nub_z(i, p)
+    plan = prism([(x0 + 0.1, yf), (x0 - p.nub_out, yf), (x0 - p.nub_out, yb - p.nub_out), (x0, yb), (x0 + 0.1, yb)], z0, z1)
+    side = xz_prism([(x0 + 0.1, z0), (x0, z0), (x0 - p.nub_out, z0 + p.nub_out), (x0 - p.nub_out, z1), (x0 + 0.1, z1)], yf - 1, yb + 1)
+    return plan.intersect(side)
+
+
+def div_ribs(i, p=P):
+    x0, x1, _, y1, h = drawer_box(p)
+    cx = (x0 + x1) / 2
+    z0, z1 = drawer_z(i, p) + p.floor - 0.1, drawer_z(i, p) + h
+    out = []
+    for dx in p.div_xs:
+        for s in (-1, 1):
+            xa = cx + dx + s * p.div_slot / 2
+            xb = xa + s * p.rib_w
+            xa, xb = sorted((xa, xb))
+            out.append(box(xa, xb, -0.1, p.rib, z0, z1))
+            out.append(box(xa, xb, y1 - p.wall - p.rib, y1 - p.wall + 0.1, z0, z1))
+    return out
+
+
+def make_drawer(i, p=P, pressed=False):
+    """Drawer i, closed. `pressed` bends its stop leaf in, clear of the rail."""
+    x0, x1, y0, y1, h = drawer_box(p)
+    z = drawer_z(i, p)
+    d = box(x0, x1, y0, y1, z, z + h).cut(box(x0 + p.wall, x1 - p.wall, y0 - 0.1, y1 - p.wall, z + p.floor, z + h + 0.1))
+    ly0, ly1 = leaf_y(p)
+    slits = [box(x0 - 0.1, x0 + p.wall + 0.1, y, y + p.leaf_slit, z + p.floor, z + h + 0.1) for y in (ly0 - p.leaf_slit, ly1)]
+    d = cut_all(d, slits)
+    nub = stop_nub(i, p)
+    if pressed:
+        leaf = box(x0, x0 + p.wall, ly0, ly1, z + p.floor, z + h)
+        d = d.cut(leaf).union(leaf.translate((p.nub_out + 0.2, 0, 0)))
+        nub = nub.translate((p.nub_out + 0.2, 0, 0))
+    for part in [front_plate(i, p), pull(i, p), fin(i, p), nub] + div_ribs(i, p):
+        d = d.union(part)
+    return d
+
+
+def drawer_at(i, t, p=P, pressed=False):
+    """Drawer i pulled out by t."""
+    return make_drawer(i, p, pressed).translate((0, -t, 0))
+
+
+def drawer_print(part, i, p=P):
+    """Upright, the floor and the front plate's bottom on the bed."""
+    return part.translate((0, 0, -drawer_z(i, p)))
+
+
+def make_divider(p=P):
+    """Drops into a pair of slots, front to back, splitting the drawer."""
+    _, _, _, y1, h = drawer_box(p)
+    d = box(-p.div_t / 2, p.div_t / 2, 0.3, y1 - p.wall - 0.3, 0, h - p.floor - 6)
+    return d.edges("|X and >Z").fillet(3.0)
+
+
+def divider_in(i, slot, p=P):
+    x0, x1 = drawer_box(p)[:2]
+    return make_divider(p).translate(((x0 + x1) / 2 + p.div_xs[slot], 0, drawer_z(i, p) + p.floor + 0.2))
+
+
+def divider_print(part, p=P):
+    return part.rotate((0, 0, 0), (0, 1, 0), 90).translate((0, 0, p.div_t / 2))
