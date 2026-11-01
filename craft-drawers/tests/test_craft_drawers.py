@@ -47,3 +47,40 @@ def test_lock_geometry_numbers():
 
 def test_travel_stop():
     assert cd.travel_stop() == pytest.approx(cd.drawer_box()[3] * 2 / 3)
+
+
+# --- Frame ------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def frame():
+    return cd.make_frame()
+
+
+def test_frame_is_one_solid(frame):
+    assert len(frame.solids().vals()) == 1 and frame.val().isValid()
+
+
+def test_frame_fits_bed_on_its_back(frame):
+    assert max(size(cd.frame_print(frame))) <= P.bed
+
+
+def test_frame_outside_closed(frame):
+    # every outer face is closed except the front opening; the top only has
+    # the badge slot
+    assert cd.outside_openings(frame) == ["front"]
+
+
+def test_frame_prints_without_supports(frame):
+    allow = [cd.frame_print(z) for z in cd.bridge_zones()]
+    assert cd.overhang_area(cd.frame_print(frame), allow=allow) < 5.0
+
+
+def test_fork_near_every_cam():
+    for i in range(P.bays):
+        z0, z1 = cd.cam_span(i)
+        assert min(abs((z0 + z1) / 2 - zf) for zf in cd.fork_zs()) <= cd.pitch() / 2 + 1
+
+
+def test_rail_stops_at_travel():
+    assert cd.nub_front_y() - cd.stop_y() == pytest.approx(cd.travel_stop())

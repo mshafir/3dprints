@@ -189,6 +189,39 @@ def travel_stop(p=P):
     return p.stop_frac * drawer_box(p)[3]
 
 
+def leaf_y(p=P):
+    """Front and back of the stop leaf in the drawer's left wall."""
+    y1 = drawer_box(p)[3] - p.wall - p.leaf_back
+    return y1 - p.leaf_w, y1
+
+
+def nub_front_y(p=P):
+    """The nub's flat front face, drawer closed."""
+    return leaf_y(p)[0] + 1.0
+
+
+def nub_z(i, p=P):
+    top = drawer_z(i, p) + drawer_box(p)[4] - p.nub_top
+    return top - p.nub_h, top
+
+
+def stop_y(p=P):
+    """Back end of the stop rail."""
+    return nub_front_y(p) - travel_stop(p)
+
+
+def slot(p=P):
+    """The opening in the top the rod goes in by: x0, x1, y0, y1."""
+    x, y = rod_xy(p)
+    r = p.bore_r + p.tube_wall + 0.3
+    return drawer_box(p)[1], x + r, y - r, y + r
+
+
+def fork_zs(p=P):
+    """Heights where the rod is held: the forks in bays 1 up, and the floor boss."""
+    return [p.cap + p.boss_h] + [bay_z(i, p) + p.ledge_t / 2 for i in range(1, p.bays)]
+
+
 def outside(p=P):
     """Width, depth with the pulls, height with the lock badge."""
     return p.width, p.depth + p.front_t + p.pull_proud, p.height + p.badge_t
@@ -234,6 +267,47 @@ def turn(part, deg, x=0.0, y=0.0):
     return part.rotate((x, y, 0), (x, y, 1), deg)
 
 
+def grow(pts, d):
+    """A polygon with every edge moved outward by d (inward if d < 0)."""
+    if sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1])) < 0:
+        pts = pts[::-1]  # counter-clockwise, so the right of each edge is outside
+    lines = []
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+        length = math.hypot(x1 - x0, y1 - y0)
+        nx, ny = (y1 - y0) / length, -(x1 - x0) / length
+        lines.append(((x0 + nx * d, y0 + ny * d), (x1 - x0, y1 - y0)))
+    out = []
+    for ((ax, ay), (adx, ady)), ((bx, by), (bdx, bdy)) in zip(lines[-1:] + lines[:-1], lines):
+        t = ((bx - ax) * bdy - (by - ay) * bdx) / (adx * bdy - ady * bdx)
+        out.append((ax + adx * t, ay + ady * t))
+    return out
+
+
+def teardrop(r, z0, z1, x=0.0, y=0.0, toward=1):
+    """Upright cylinder with a 45 degree point toward +y (toward=1) or -y, so
+    it prints lying on the frame's back: a boss points +y, a hole -y."""
+    k = r / math.sqrt(2)
+    tip = [(x - k, y + toward * k), (x, y + toward * r * math.sqrt(2)), (x + k, y + toward * k), (x, y)]
+    return cyl(r, z0, z1, x, y).union(prism(tip, z0, z1))
+
+
+def shape_on_side(name, u, v, size, x_out, inward, depth, extra=0.1):
+    """A shape recessed into a side wall with 45 degree walls: (u, v) is its
+    centre in (y, z), x_out the wall's outside, inward -1 on the right side
+    and +1 on the left."""
+    x_in = x_out + inward * depth
+    x_far = x_out - inward * extra
+    pts = shape_pts(name, size)
+    if pts is None:
+        r = size / 2
+        lo, hi = sorted([(x_in, r - depth), (x_far, r + extra)])
+        return cq.Workplane(obj=cq.Solid.makeCone(lo[1], hi[1], hi[0] - lo[0], cq.Vector(lo[0], u, v), cq.Vector(1, 0, 0)))
+    a = [(u + py, v + pz) for py, pz in grow(pts, -depth)]
+    b = [(u + py, v + pz) for py, pz in grow(pts, extra)]
+    wa = cq.Workplane("YZ").workplane(offset=x_in).polyline(a).close()
+    return wa.workplane(offset=x_far - x_in).polyline(b).close().loft(ruled=True)
+
+
 def shape_pts(name, size):
     """Outline of a pull or decoration shape, centred on 0, about `size`
     across; None for the circle."""
@@ -276,3 +350,137 @@ def overhang_area(part, max_deg=48.0, allow=()):
 def grams(part):
     """Solid PLA weight; the print is lighter where infill replaces solid."""
     return part.val().Volume() / 1000 * 1.24
+
+
+# --- Frame --------------------------------------------------------------------
+
+
+def shell(p=P):
+    """The outside box: front edges rounded, back edges chamfered so they
+    print on the bed."""
+    s = box(-p.width / 2, p.width / 2, 0, p.depth, 0, p.height)
+    s = s.edges("|Z and <Y").fillet(p.edge_r)
+    return s.edges("|Z and >Y").chamfer(p.edge_r / 2)
+
+
+def ledges(p=P):
+    xl, xr = inner_x(p)
+    x0, x1 = drawer_box(p)[:2]
+    y1 = p.depth - p.back
+    out = []
+    for i in range(p.bays):
+        z = bay_z(i, p)
+        out.append(box(xl - 0.1, x0 + p.ledge_under, 0, y1 + 0.1, z, z + p.ledge_t))
+        right = box(x1 - p.ledge_under, xr + 0.1, 0, y1 + 0.1, z, z + p.ledge_t)
+        if i > 0:
+            right = right.cut(fork_notch(z, p))
+        out.append(right)
+    return out
+
+
+def fork_notch(z, p=P):
+    """Notch round the rod in a right ledge, open toward the drawers. The
+    front arm bears on the rod; past the rod its edge runs off forward at 45
+    degrees so it prints."""
+    x, y = rod_xy(p)
+    r = p.rod_r + p.fork_clr
+    xe = drawer_box(p)[1] - p.ledge_under - 1
+    flat = x - p.rod_r + 1.0  # the arm stays square across the rod's front
+    pts = [(x + r, y - r), (x + r, y + r), (xe, y + r), (xe, y - r - (flat - xe)), (flat, y - r)]
+    return prism(pts, z - 0.1, z + p.ledge_t + 0.1)
+
+
+def floor_boss(p=P):
+    x, y = rod_xy(p)
+    return teardrop(p.rod_r + 2, p.cap - 0.1, p.cap + p.boss_h, x, y)
+
+
+def rod_socket(p=P):
+    x, y = rod_xy(p)
+    top = p.cap + p.boss_h
+    return teardrop(p.rod_r + p.fork_clr, top - p.pin_depth, top + 0.1, x, y, toward=-1)
+
+
+def rails(p=P):
+    """Stop rails on the left inner face: ramped at the front, square at the back."""
+    xl = inner_x(p)[0]
+    y0, y1 = 0.5, stop_y(p)
+    pts = [(xl - 0.1, y0), (xl, y0), (xl + p.rail_out, y0 + p.rail_out), (xl + p.rail_out, y1), (xl - 0.1, y1)]
+    return [prism(pts, *nub_z(i, p)) for i in range(p.bays)]
+
+
+def screw_bosses(p=P):
+    xl, xr = inner_x(p)
+    top = p.height - p.cap
+    room = box(xl, xr, 0, p.depth - p.back, p.cap, top + 0.1)
+    return [teardrop(p.boss_r, top - p.boss_len, top + 0.1, x, y).intersect(room) for x, y in p.screws]
+
+
+def screw_holes(p=P):
+    return [teardrop(p.screw_pilot / 2, p.height - p.cap - p.boss_len - 0.1, p.height + 0.1, x, y, toward=-1) for x, y in p.screws]
+
+
+def top_slot(p=P):
+    x0, x1, y0, y1 = slot(p)
+    return box(x0, x1, y0, y1, p.height - p.cap - 0.1, p.height + 0.1)
+
+
+def decor(p=P):
+    """One of each shape on each side, recessed."""
+    spots = [(55.0, 75.0), (130.0, 75.0), (55.0, 170.0), (130.0, 170.0)]
+    out = []
+    for side, inward in ((p.width / 2, -1), (-p.width / 2, 1)):
+        names = SHAPES if inward < 0 else SHAPES[::-1]
+        out += [shape_on_side(n, u, v, p.decor_size, side, inward, p.decor_depth) for n, (u, v) in zip(names, spots)]
+    return out
+
+
+def bumpers(p=P):
+    xs = (-p.width / 2 + p.bump_inset, p.width / 2 - p.bump_inset)
+    ys = (p.bump_inset, p.depth - p.bump_inset)
+    return [cyl(p.bump_r, -0.1, p.bump_d, x, y) for x in xs for y in ys]
+
+
+def make_frame(p=P):
+    xl, xr = inner_x(p)
+    body = shell(p).cut(box(xl, xr, -1, p.depth - p.back, p.cap, p.height - p.cap))
+    for part in ledges(p) + rails(p) + screw_bosses(p) + [floor_boss(p)]:
+        body = body.union(part)
+    return cut_all(body, [top_slot(p), rod_socket(p)] + screw_holes(p) + decor(p) + bumpers(p))
+
+
+def frame_print(part, p=P):
+    """Turned onto its back, front up: z = 0 is the back."""
+    return part.rotate((0, 0, 0), (1, 0, 0), -90).translate((0, 0, p.depth))
+
+
+def bridge_zones(p=P):
+    """Where the frame, printed on its back, has planned flat undersides, in
+    frame coordinates: the rails' square back ends, the fork arms across the
+    rod, the slot's edge and the bumper pockets."""
+    xl = inner_x(p)[0]
+    x, y = rod_xy(p)
+    zones = [box(xl - 0.1, xl + p.rail_out + 0.1, stop_y(p) - 0.2, stop_y(p) + 0.2, *nub_z(i, p)) for i in range(p.bays)]
+    zones += [box(x - p.rod_r, x + p.rod_r + 1, y - p.rod_r - 0.6, y - p.rod_r, bay_z(i, p) - 0.1, bay_z(i, p) + p.ledge_t + 0.1) for i in range(1, p.bays)]
+    x0, x1, y0, y1 = slot(p)
+    zones.append(box(x0 - 0.1, x1 + 0.1, y0 - 0.2, y0 + 0.2, p.height - p.cap - 0.1, p.height + 0.1))
+    zones += [cyl(p.bump_r + 0.2, -0.1, p.bump_d + 0.1, *c.val().Center().toTuple()[:2]) for c in bumpers(p)]
+    return zones
+
+
+def outside_openings(frame, p=P):
+    """Outer faces with a hole through them, probing a thin slab just inside
+    each face, deeper than the decoration and bumper recesses; the top's
+    badge slot and screw holes, under the badge, are allowed for. Names in the order front, back, left, right,
+    bottom, top."""
+    w, d, h = p.width / 2, p.depth, p.height
+    a, b, m = 0.9, 1.15, p.edge_r + 1
+    slabs = {
+        "front": box(-w + m, w - m, a, b, m, h - m),
+        "back": box(-w + m, w - m, d - b, d - a, m, h - m),
+        "left": box(-w + a, -w + b, m, d - m, m, h - m),
+        "right": box(w - b, w - a, m, d - m, m, h - m),
+        "bottom": box(-w + m, w - m, m, d - m, a, b),
+        "top": cut_all(box(-w + m, w - m, m, d - m, h - b, h - a), [top_slot(p)] + screw_holes(p)),
+    }
+    return [n for n, s in slabs.items() if s.cut(frame).val().Volume() > 0.01]
