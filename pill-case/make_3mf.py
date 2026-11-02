@@ -57,6 +57,7 @@ PLATES = {
     # what is being tested. Print "Fit tests, lid" first: it has the door.
     "Fit tests, lid": [[(n, CLEAR)] for n in ("test_door", "test_hub_lid")],
     "Fit tests, base and dial": [[(n, DARK)] for n in ("test_hub_base", "test_hub_dial")],
+    "Fit test, pill pocket": [[("test_pocket", DARK)]],
     "Base": [[("base", DARK)]],
     "Lid with door": [[("lid_with_door", CLEAR)]],
     # On its own plate so the swap to white happens once, above everything else

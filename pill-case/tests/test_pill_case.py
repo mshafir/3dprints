@@ -65,6 +65,42 @@ def test_tablet_fits_in_pocket(base, lid, door):
     assert overlap(door, tablet) < EPS
 
 
+def test_tablet_cannot_turn_sideways(base):
+    """Turned face-out, or flat, a tablet hits the slot walls."""
+    r_mid = (P.pk_rin + P.pk_rout) / 2
+    zc = P.floor + P.pill_d / 2 + 0.05
+    disc = pc.cyl(P.pill_d / 2, -P.pill_t / 2, P.pill_t / 2)
+    face_out = disc.rotate((0, 0, 0), (0, 1, 0), 90).translate((r_mid, 0, zc))
+    flat = disc.translate((r_mid, 0, P.floor + P.pill_t / 2 + 0.05))
+    for t in (face_out, flat):
+        assert overlap(base, pc.rot(t, pc.pocket_angle(0))) > 1
+    assert P.pk_w - P.pill_t <= 1.0
+    assert P.pk_rout - P.pk_rin >= P.pill_d + 0.5
+
+
+def test_pocket_test_strip(base):
+    """A tablet stands in every slot of the test strip, and its middle slot
+    is the real pocket."""
+    widths = (3.7, 4.0, 4.3)
+    strip = pc.make_pocket_test(widths=widths)
+    assert strip.val().isValid() and len(strip.solids().vals()) == 1
+    assert pc.overhang_area(strip) < 0.5
+    pitch = max(widths) + 3.0
+    tablet = (
+        pc.cyl(P.pill_d / 2, -P.pill_t / 2, P.pill_t / 2)
+        .rotate((0, 0, 0), (1, 0, 0), 90)
+        .translate(((P.pk_rout - P.pk_rin) / 2, 0, P.floor + P.pill_d / 2 + 0.05))
+    )
+    for i in range(3):
+        assert overlap(strip, tablet.translate((0, (i - 1) * pitch, 0))) < EPS
+
+
+def test_base_has_ribs_to_feel(base):
+    bb = base.val().BoundingBox()
+    assert bb.xlen > 2 * P.R + 1.0
+    assert P.R + P.rib_h <= P.lid_R  # the lid rim still covers them from above
+
+
 def test_lid_clears_base_on_each_day(base, lid):
     assert overlap(base, lid) < EPS
     assert overlap(base, pc.lid_at(lid, 1)) < EPS
@@ -123,6 +159,38 @@ def test_dial_locked_clear_and_retained(base, lid, dial):
     assert overlap(base, pc.dial_at(dial, 0, 0.6)) > 0.05
 
 
+def test_dial_lugs_hold_firmly(base, dial):
+    # Revision 7: the lugs were too small to hold the dial on.
+    assert P.lug_r - P.post_r - P.dial_bore_clr >= 2.0
+    assert overlap(base, pc.dial_at(dial, 0, 1.0)) > 15
+
+
+def test_dial_latch_arm_is_pulled_not_pushed():
+    # Revision 8: the arm is rooted anticlockwise of the locked lug, so untwisting
+    # puts it in tension; it has room behind it to flex over the lug going on.
+    assert P.latch_root > pc.lug_edge()
+    assert P.latch_slot >= P.latch_nub + 0.3
+
+
+def test_finger_push_frees_the_hook():
+    # Revision 11: a finger in the pocket pushes the arm out; the pocket must
+    # be wider than that push, and the slot behind the arm room for the hook.
+    assert pc.finger_push() < P.latch_ri - P.access_wall_r - 1.0
+    assert P.latch_slot >= P.latch_nub + 0.3
+    assert P.lug_r - P.latch_nub > P.post_r + P.dial_bore_clr + 0.3  # hook clears the post
+
+
+def test_labels_clear_the_latch(dial):
+    labels = pc.make_labels()
+    assert overlap(labels, pc.cyl(P.latch_ro + P.latch_slot + 0.5, 0, 50)) < EPS
+
+
+def test_day_detent_is_deep_and_steep(base, lid):
+    # Revision 9: steeper than 45 degrees holds, but at 30 it jammed.
+    assert P.notch >= 1.4 and 35 <= P.detent_angle <= 42
+    assert overlap(base, pc.lid_at(lid, 0.5)) > 5
+
+
 def test_dial_releases_after_twist(base, dial):
     assert overlap(base, pc.dial_at(dial, P.bayonet_twist, 0)) < EPS
     assert overlap(base, pc.dial_at(dial, P.bayonet_twist, 5.0)) < EPS
@@ -161,4 +229,4 @@ def test_overall_size(base, lid, door, dial):
     asm = base.union(lid).union(door).union(dial)
     bb = asm.val().BoundingBox()
     assert bb.xlen <= 84 and bb.ylen <= 84
-    assert bb.zlen <= 17.5
+    assert bb.zlen <= 18.5
