@@ -17,10 +17,10 @@ from pathlib import Path
 
 import cadquery as cq
 
-LOCKED = 180  # cams point -x, at the drawers' tabs
-UNLOCKED = 90  # cams point back, clear of the tabs: unlocking turns clockwise,
-# so a pull on a locked drawer, which turns the cams counter-clockwise, drives
-# the rod into its stop instead of toward unlocked
+LOCKED = 180  # cams point -x, into the drawers' pockets
+UNLOCKED = 90  # cams point back: unlocking turns clockwise, so a pull on a
+# locked drawer, which turns the cams counter-clockwise, drives each cam into a
+# post in the frame right in front of it
 SHAPES = ("circle", "triangle", "square", "star")  # recessed in the frame's sides
 
 
@@ -40,10 +40,11 @@ class Params:
     # Ledges the drawers run on: a strip on each side wall, no shelves
     ledge_t: float = 1.6
     ledge_under: float = 6.0  # how far under the drawer
+    ledge_left: float = 20.0  # the left ledge, under the drawer's stop latch
     head_gap: float = 1.0  # drawer top to the ledge above, so a tipped drawer stays put
 
     # Drawer
-    gap_left: float = 4.0  # room for the stop rail
+    gap_left: float = 2.0
     column: float = 16.0  # drawer's right wall to the frame's right inner face: the lock rod
     wall: float = 1.2
     floor: float = 1.2
@@ -64,15 +65,16 @@ class Params:
 
     # Lock: a rod in the front right corner with one cam per drawer. Locked, a
     # cam reaches into a pocket in its drawer's side; with a drawer open, the
-    # drawer's wall is in the cam's way, so the key will not turn.
+    # drawer's wall is in the cam's way, so the key will not turn. A pull on a
+    # locked drawer turns the rod, and a post in the frame in front of each
+    # cam stops it.
     rod_r: float = 3.5
     rod_dx: float = 7.5  # rod axis from the drawer's right wall
     rod_y: float = 13.0
-    stile: float = 2.0  # front post ahead of the rod
-    cam_r: float = 10.5  # axis to tip: 3 mm into the drawer's wall
+    cam_r: float = 10.5  # axis to the square tip: 3 mm into the drawer's wall
     cam_w: float = 6.0
-    cam_h: float = 5.0
-    cam_z: float = 24.5  # cam bottom above the drawer's underside
+    cam_h: float = 8.0
+    cam_z: float = 5.0  # cam bottom above the drawer's underside: low, by the forks, clear of the floor boss
     pocket_clr: float = 0.4
     post_wall: float = 1.2  # behind the pocket, in a post in the drawer's corner
     lock_clr: float = 0.5
@@ -91,27 +93,24 @@ class Params:
     pin_depth: float = 6.0  # still 2.7 mm in when the rod is lifted to the tube
     boss_h: float = 6.0  # floor boss holding the rod's foot
 
-    # Stop: a lug on the rod below the badge's tube meets a tooth hanging from
-    # the tube just past locked
-    lug_r: float = 6.8
-    lug_w: float = 3.0
-    lug_h: float = 3.0
-    tooth_r: tuple = (5.6, 7.3)
-    tooth_a: tuple = (200.0, 224.0)  # degrees, absolute
-
-    # Socket: three lobes round a hub, turned to keep clear of the detent
-    # notches and the print flat
+    # Socket: three lobes round a hub, clear of the print flat
     hub_r: float = 1.5
     lobe_r: float = 0.95
     lobe_at: float = 1.9
     lobe_a: tuple = (100.0, 220.0, 340.0)  # from the cam direction
     key_clr: float = 0.25  # the socket prints on its side
 
-    # Detent: a leaf in the tube wall presses a nub into notches in the head
-    det_press: float = 0.7
+    # Click: an arm in the frame, running front to back beside the rod's top,
+    # presses a nub against a collar on the rod. It drops into a notch when
+    # unlocked and onto the rod's print flat when locked.
+    collar_r: float = 4.6
+    collar_h: float = 22.0
+    arm_t: float = 2.2
+    arm_len: float = 40.0
+    arm_clr: float = 0.4  # collar to the arm
+    det_press: float = 1.0
     nub_r: float = 1.0
-    notch_r: float = 1.1
-    det_w: float = 4.0
+
 
     # Lock badge on top, over the slot the rod goes in by
     badge_t: float = 3.0
@@ -127,17 +126,24 @@ class Params:
     boss_len: float = 10.0
     web: float = 1.6  # runs each screw boss back to the back wall
 
-    # Drawer stop: a leaf in the drawer's left wall carries a nub that meets
-    # the back end of a rail on the frame's left wall
-    leaf_w: float = 20.0  # wide and short, to take a yank
-    leaf_len: float = 30.0  # springs from this far below the wall top
-    leaf_slit: float = 0.6
-    leaf_back: float = 4.0  # leaf's back edge ahead of the inside of the drawer's back wall
-    nub_out: float = 3.2
-    nub_h: float = 6.0
-    nub_top: float = 4.0  # nub top below the wall top
-    rail_out: float = 3.6
-    guide: float = 0.5  # play to a rib on the right ledge, so a drawer can't dodge the rail
+    # Drawer stop: a nub on the left ledge runs in a covered channel under the
+    # drawer's floor and meets a crossbar near the back. The crossbar hangs on
+    # two springy floor strips anchored ahead of it, so a pull stretches them;
+    # an adult lifts the crossbar's tab to take the drawer out.
+    latch_hinge_w: float = 4.0
+    latch_t: float = 1.6  # the strips, thicker than the floor
+    latch_len: float = 50.0  # the strips, crossbar to anchor
+    latch_bar: float = 9.0  # the crossbar, front to back: stiff between the strips
+    latch_slit: float = 0.6
+    latch_back: float = 4.0  # crossbar to the inside of the back wall
+    tunnel_w: float = 6.0  # the rail in it is 1 mm narrower
+    tunnel_h: float = 2.4
+    tunnel_roof: float = 1.0
+    tunnel_wall: float = 1.2
+    latch_nub_h: float = 2.0
+    latch_fillet: float = 1.0  # at the rail's root, cleared by a bevel on the crossbar
+    latch_lift: float = 2.5  # lifting the crossbar this far frees the drawer
+    latch_tab: float = 6.0  # finger tab on the crossbar
     stop_frac: float = 2 / 3
 
     # Dividers
@@ -222,39 +228,34 @@ def cam_span(i, p=P):
 
 
 def travel_stop(p=P):
-    """How far a drawer pulls out before its nub meets the rail."""
+    """How far a drawer pulls out before the latch catches."""
     return p.stop_frac * drawer_box(p)[3]
 
 
-def leaf_y(p=P):
-    """Front and back of the stop leaf in the drawer's left wall."""
-    y1 = drawer_box(p)[3] - p.wall - p.leaf_back
-    return y1 - p.leaf_w, y1
+def latch_x(p=P):
+    """Left edges, from the drawer's left wall, of the stop latch's strips:
+    left strip, channel walls and channel, right strip."""
+    x0 = drawer_box(p)[0]
+    s, w, tw = p.latch_slit, p.latch_hinge_w, p.tunnel_wall
+    a = x0 + p.wall + s  # left strip
+    b = a + w + s  # left channel wall
+    c = b + tw  # channel
+    d = c + p.tunnel_w  # right channel wall
+    e = d + tw + s  # right strip
+    return {"left": a, "wall_l": b, "chan": c, "wall_r": d, "right": e, "end": e + w}
 
 
-def nub_front_y(p=P):
-    """The nub's flat front face, drawer closed."""
-    return leaf_y(p)[0] + 1.0
+def latch_y(p=P):
+    """Along the drawer, closed: the crossbar's face, its back, and the
+    strips' anchor."""
+    back = drawer_box(p)[3] - p.wall - p.latch_back
+    face = back - p.latch_bar
+    return {"face": face, "back": back, "anchor": face - p.latch_len}
 
 
-def nub_z(i, p=P):
-    top = drawer_z(i, p) + drawer_box(p)[4] - p.nub_top
-    return top - p.nub_h, top
-
-
-def side_play(p=P):
-    """How far a drawer can shift toward the lock side, to the guide rib."""
-    return p.guide
-
-
-def stop_catch(p=P):
-    """How far the nub overlaps the rail."""
-    return p.rail_out + p.nub_out - p.gap_left
-
-
-def stop_y(p=P):
-    """Back end of the stop rail."""
-    return nub_front_y(p) - travel_stop(p)
+def latch_nub_y(p=P):
+    """The top back edge of the ledge's rail, which meets the crossbar's face."""
+    return latch_y(p)["face"] - travel_stop(p)
 
 
 def screw_xy(p=P):
@@ -263,10 +264,23 @@ def screw_xy(p=P):
 
 
 def slot(p=P):
-    """The opening in the top the rod goes in by: x0, x1, y0, y1."""
+    """The opening in the top the rod goes in by, cams pointing back:
+    x0, x1, y0, y1."""
     x, y = rod_xy(p)
     r = p.bore_r + p.tube_wall + 0.3
-    return x - p.cam_r - 0.5, x + r, y - r, y + r
+    return x - r, x + r, y - r, y + p.cam_r + 0.5
+
+
+def collar_z(p=P):
+    """The click's collar on the rod, just under the flange."""
+    top = flange_top(p) - p.flange_t - 2.0
+    return top - p.collar_h, top
+
+
+def stop_post_x(p=P):
+    """The posts that stop the cams past locked: between the drawers and the
+    rod's keel."""
+    return drawer_box(p)[1] + 0.5, rod_xy(p)[0] - rod_reach(p) - 0.6
 
 
 def fork_zs(p=P):
@@ -426,36 +440,96 @@ def shell(p=P):
 
 
 def ledges(p=P):
+    """Left and right ledge for each bay. Above the bottom bay the right ledge
+    has a slot round the rod, open toward the back, that the cams drop
+    through pointing back."""
     xl, xr = inner_x(p)
     x0, x1 = drawer_box(p)[:2]
     y1 = p.depth - p.back
     out = []
     for i in range(p.bays):
         z = bay_z(i, p)
-        out.append(box(xl - 0.1, x0 + p.ledge_under, 0, y1 + 0.1, z, z + p.ledge_t))
+        out.append(box(xl - 0.1, x0 + p.ledge_left, 0, y1 + 0.1, z, z + p.ledge_t))
         right = box(x1 - p.ledge_under, xr + 0.1, 0, y1 + 0.1, z, z + p.ledge_t)
         if i > 0:
             right = right.cut(fork_notch(z, p))
         out.append(right)
-        g = x1 + p.guide
-        out.append(box(g, g + 1.2, pocket_y(p)[1] + 1.0, y1 + 0.1, z + p.ledge_t - 0.1, z + p.ledge_t + 1.5))
     return out
 
 
 def fork_notch(z, p=P):
-    """Notch round the rod in a right ledge, open toward the drawers. The
-    front arm meets the rod on a 45 degree face, touching the rod's circle,
-    so it grows from the ledge when the frame prints on its back and still
-    takes the pull of a locked drawer."""
+    """Slot round the rod, open toward the back. Its front is a 45 degree
+    point, so it grows from the ledge when the frame prints on its back, and
+    the point's sides hold the rod against the pull of a locked drawer."""
     x, y = rod_xy(p)
     r = p.rod_r + p.fork_clr
-    xe = drawer_box(p)[1] - p.ledge_under - 1
+    y1 = p.depth - p.back + 0.2
+    return teardrop(r, z - 0.1, z + p.ledge_t + 0.1, x, y, toward=-1).union(box(x - r, x + r, y, y1, z - 0.1, z + p.ledge_t + 0.1))
 
-    def arm(xa):  # the 45 degree face, tangent to radius r at -45 degrees
-        return y - r * math.sqrt(2) - x + xa
 
-    pts = [(x + r, y + r), (xe, y + r), (xe, arm(xe)), (x + r, arm(x + r))]
-    return prism(pts, z - 0.1, z + p.ledge_t + 0.1)
+def stop_posts(p=P):
+    """A post in front of the cams: past locked, each cam's front meets its
+    back corner, out by the drawer where the cam's lever on it is longest.
+    Its back is 45 degrees, so it prints. Brackets just below and above each
+    cam tie it to the side wall, clear of the rod, so the cam pushes on a
+    short braced length."""
+    xa, xb = stop_post_x(p)
+    xr = inner_x(p)[1]
+    ys = p.rod_y - p.cam_w / 2 - p.pocket_clr
+    post = prism([(xa, 0), (xb, 0), (xb, ys - (xb - xa)), (xa, ys)], p.cap - 0.1, cam_span(p.bays - 1, p)[1] + 3.0)
+    depth = rod_xy(p)[1] - p.collar_r - 1.0  # clear of the rod, its keel and collar
+    out = [post]
+    for i in range(p.bays):
+        c0, c1 = cam_span(i, p)
+        for z0, z1 in ((drawer_z(i, p) - 0.1, c0 - 0.5), (c1 + 0.5, c1 + 5.0)):  # below and above the cam
+            out.append(yz_prism([(0, z0), (depth, z0), (depth - (z1 - z0), z1), (0, z1)], xa, xr + 0.1))
+            # Beside the post, as deep as the post, so the edge the cam presses is braced
+            out.append(yz_prism([(0, z0), (ys, z0), (ys - (z1 - z0), z1), (0, z1)], xa, xb))
+    return out
+
+
+def unlock_stop(p=P):
+    """Beside the top cam: just past unlocked, the cam's corner meets it."""
+    x, y = rod_xy(p)
+    xr = inner_x(p)[1]
+    xa = x + p.cam_w / 2 + 2.2
+    yb = y + p.cam_r + 2.5
+    pts = [(xa, y - 4.0), (xr + 0.1, y - 4.0), (xr + 0.1, yb + (xr - xa)), (xa, yb)]
+    z = drawer_z(p.bays - 1, p)
+    return prism(pts, z - 0.1, cam_span(p.bays - 1, p)[1] + 2.0)
+
+
+def click_arm(p=P):
+    """A springy arm on the frame's right, front to back beside the collar,
+    with a nub at its free front end. It bends sideways, so it prints
+    standing up on the frame's back."""
+    x, y = rod_xy(p)
+    xr = inner_x(p)[1]
+    xa = x + p.collar_r + p.arm_clr
+    z0, z1 = collar_z(p)
+    ya, yb = y - p.nub_r - 0.5, y + p.arm_len
+    arm = box(xa, xa + p.arm_t, ya, yb + 0.1, z0, z1)
+    base = prism([(xa, yb), (xr + 0.1, yb), (xr + 0.1, yb + 3 + (xr - xa)), (xa, yb + 3)], z0, z1)
+    tip = x + p.collar_r - p.det_press  # how far in the nub reaches
+    nub = teardrop(p.nub_r, z0 + 2, z1 - 2, tip + p.nub_r, y).union(box(tip + p.nub_r, xa + 0.1, y - p.nub_r, y + p.nub_r, z0 + 2, z1 - 2))
+    return [arm.union(base).union(nub)]
+
+
+def latch_nubs(p=P):
+    """A rail on each left ledge, from the front to the catch, running in the
+    drawer's channel. Its back end is square where the crossbar meets it,
+    with a 45 degree fillet below that the crossbar's bevel clears: the
+    fillet stiffens the rail's root, and the square face is short enough to
+    print."""
+    lx = latch_x(p)
+    xa, xb = lx["chan"] + 0.5, lx["wall_r"] - 0.5
+    ys = latch_nub_y(p)
+    h, f = p.latch_nub_h, p.latch_fillet
+    out = []
+    for i in range(p.bays):
+        z = drawer_z(i, p)
+        out.append(yz_prism([(1.0, z - 0.1), (ys + f + 0.1, z - 0.1), (ys, z + f), (ys, z + h), (1.0, z + h)], xa, xb))
+    return out
 
 
 def floor_boss(p=P):
@@ -467,14 +541,6 @@ def rod_socket(p=P):
     x, y = rod_xy(p)
     top = p.cap + p.boss_h
     return teardrop(p.rod_r + p.fork_clr, top - p.pin_depth, top + 0.1, x, y, toward=-1)
-
-
-def rails(p=P):
-    """Stop rails on the left inner face: ramped at the front, square at the back."""
-    xl = inner_x(p)[0]
-    y0, y1 = 0.5, stop_y(p)
-    pts = [(xl - 0.1, y0), (xl, y0), (xl + p.rail_out, y0 + p.rail_out), (xl + p.rail_out, y1), (xl - 0.1, y1)]
-    return [prism(pts, *nub_z(i, p)) for i in range(p.bays)]
 
 
 def screw_bosses(p=P):
@@ -516,7 +582,7 @@ def bumpers(p=P):
 def make_frame(p=P):
     xl, xr = inner_x(p)
     body = shell(p).cut(box(xl, xr, -1, p.depth - p.back, p.cap, p.height - p.cap))
-    for part in ledges(p) + rails(p) + screw_bosses(p) + [floor_boss(p)]:
+    for part in ledges(p) + latch_nubs(p) + stop_posts(p) + [unlock_stop(p)] + click_arm(p) + screw_bosses(p) + [floor_boss(p)]:
         body = body.union(part)
     return cut_all(body, [top_slot(p), rod_socket(p)] + screw_holes(p) + decor(p) + bumpers(p))
 
@@ -528,13 +594,13 @@ def frame_print(part, p=P):
 
 def bridge_zones(p=P):
     """Where the frame, printed on its back, has planned flat undersides, in
-    frame coordinates: the rails' square back ends, the slot's edge and the
-    bumper pockets."""
-    xl = inner_x(p)[0]
-    x, y = rod_xy(p)
-    zones = [box(xl - 0.1, xl + p.rail_out + 0.1, stop_y(p) - 0.2, stop_y(p) + 0.2, *nub_z(i, p)) for i in range(p.bays)]
+    frame coordinates: the slot's edge, the bumper pockets, and the 1 mm
+    square faces on the latch rails."""
+    lx = latch_x(p)
+    ys = latch_nub_y(p)
+    rails = [box(lx["chan"], lx["wall_r"], ys - 0.2, ys + 0.2, drawer_z(i, p) + p.latch_fillet - 0.1, drawer_z(i, p) + p.latch_nub_h + 0.1) for i in range(p.bays)]
     x0, x1, y0, y1 = slot(p)
-    zones.append(box(x0 - 0.1, x1 + 0.1, y0 - 0.2, y0 + 0.2, p.height - p.cap - 0.1, p.height + 0.1))
+    zones = rails + [box(x0 - 0.1, x1 + 0.1, y0 - 0.2, y0 + 0.2, p.height - p.cap - 0.1, p.height + 0.1)]
     zones += [cyl(p.bump_r + 0.2, -0.1, p.bump_d + 0.1, *c.val().Center().toTuple()[:2]) for c in bumpers(p)]
     return zones
 
@@ -597,10 +663,10 @@ def handle_grip(i, p=P):
 
 
 def cam_outline(angle, p=P, n=24):
-    """Points round a cam's outline, seen from above, at `angle`."""
+    """Points round a cam's square-tipped outline, seen from above, at `angle`."""
     x, y = rod_xy(p)
-    h, t = p.cam_w / 2, p.cam_r - p.cam_w / 2
-    pts = [(0, -h), (t, -h), (0, h), (t, h)] + [(t + h * math.cos(math.radians(a)), h * math.sin(math.radians(a))) for a in range(-90, 91, 180 // n)]
+    h, t = p.cam_w / 2, p.cam_r
+    pts = [(t * k / n, s * h) for k in range(n + 1) for s in (-1, 1)] + [(t, h * k / n) for k in range(-n, n + 1)]
     return [(x + px * math.cos(math.radians(angle)) - py * math.sin(math.radians(angle)), y + px * math.sin(math.radians(angle)) + py * math.cos(math.radians(angle))) for px, py in pts]
 
 
@@ -649,15 +715,65 @@ def face_shape(i, p=P):
     return cq.Workplane(obj=cq.Solid.makeLoft([wire(y_out - 0.1, 0.1), wire(y_out + p.decor_depth, -p.decor_depth)], True))
 
 
-def stop_nub(i, p=P, shift=0.0):
-    """On the outside of the stop leaf: square at the front, where it meets the
-    rail; ramped behind and underneath."""
-    x0 = drawer_box(p)[0] + shift
-    yf, yb = nub_front_y(p), leaf_y(p)[1] - 1.0
-    z0, z1 = nub_z(i, p)
-    plan = prism([(x0 + 0.1, yf), (x0 - p.nub_out, yf), (x0 - p.nub_out, yb - p.nub_out), (x0, yb), (x0 + 0.1, yb)], z0, z1)
-    side = xz_prism([(x0 + 0.1, z0), (x0, z0), (x0 - p.nub_out, z0 + p.nub_out), (x0 - p.nub_out, z1), (x0 + 0.1, z1)], yf - 1, yb + 1)
-    return plan.intersect(side)
+def latch_strip(i, p=P):
+    """Raised strip along the drawer's left floor: the channel's walls and
+    roof, and the latch's two floor strips and crossbar, cut free by slits."""
+    lx, ly = latch_x(p), latch_y(p)
+    x0, _, y0, y1, _ = drawer_box(p)
+    z = drawer_z(i, p)
+    top = z + p.tunnel_h + p.tunnel_roof
+    channel = box(lx["wall_l"], lx["right"] - p.latch_slit, -p.front_t, y1, z, top)
+    bar = prism(crossbar_plan(p), z, top)
+    strips = [box(a, b, ly["anchor"] - 2, ly["face"] + 0.1, z, z + p.latch_t) for a, b in ((lx["left"] - p.latch_slit - 1, lx["wall_l"]), (lx["right"] - p.latch_slit, lx["end"] + p.latch_slit + 1))]
+    for st in strips:
+        channel = channel.union(st)
+    tab = box(lx["chan"], lx["wall_r"], ly["face"], ly["face"] + 2.0, top - 0.1, top + p.latch_tab)  # at the front, over the strips' ends
+    return channel.union(bar).union(tab)
+
+
+def crossbar_plan(p=P):
+    """The crossbar seen from above. Its face is square across the channel,
+    so the ledge nub pushes it straight back along the strips."""
+    lx, ly = latch_x(p), latch_y(p)
+    f, b = ly["face"], ly["back"]
+    return [(lx["left"], f), (lx["end"], f), (lx["end"], b), (lx["left"], b)]
+
+
+def latch_cuts(i, p=P):
+    """The channel under the drawer, and the slits that free the latch."""
+    lx, ly = latch_x(p), latch_y(p)
+    x0, _, _, y1, _ = drawer_box(p)
+    z = drawer_z(i, p)
+    s = p.latch_slit
+    top = z + p.tunnel_h + p.tunnel_roof + p.latch_tab + 1
+    chan = box(lx["chan"], lx["wall_r"], -p.front_t - 0.1, y1 + 0.1, z - 0.1, z + p.tunnel_h).cut(prism(crossbar_plan(p), z - 0.2, z + p.tunnel_h + 0.1))
+    a, f, b = ly["anchor"], ly["face"], ly["back"]
+    cuts = [
+        box(lx["left"] - s, lx["left"], a, b + s, z - 0.1, top),  # outside the left strip
+        box(lx["end"], lx["end"] + s, a, b + s, z - 0.1, top),  # outside the right strip
+        box(lx["left"] - s, lx["end"] + s, b, b + s, z - 0.1, top),  # behind the crossbar
+        box(lx["wall_l"] - s, lx["wall_l"], a, f, z - 0.1, top),  # strip to channel wall, left
+        box(lx["right"] - s, lx["right"], a, f, z - 0.1, top),  # and right
+        box(lx["wall_l"] - s, lx["right"], f - s, f, z - 0.1, top),  # the channel ahead, from the crossbar
+    ]
+    # Bevel under the crossbar's face, clearing the rail's root fillet
+    bev = p.latch_fillet + 0.3
+    cuts.append(yz_prism([(f - 0.1, z - 0.1), (f + bev + 0.1, z - 0.1), (f - 0.1, z + bev + 0.1)], lx["chan"], lx["wall_r"]))
+    # Round ends on the slits at the strips' anchor, so they don't crack there
+    cuts += [cyl(0.7, z - 0.1, top, x + s / 2, a) for x in (lx["left"] - s, lx["wall_l"] - s, lx["right"] - s, lx["end"])]
+    # Ramp under the crossbar's back, so the nub lifts it as the drawer goes in
+    rise = p.tunnel_h + 0.2
+    ramp = yz_prism([(b + s + 0.1 - rise, z - 0.1), (b + s + 0.1, z - 0.1), (b + s + 0.1, z - 0.1 + rise)], lx["chan"], lx["wall_r"])
+    return chan, cuts, ramp
+
+
+def latch_leaf(i, p=P):
+    """The latch's moving part, for lifting it clear: crossbar, tab and strips."""
+    lx, ly = latch_x(p), latch_y(p)
+    z = drawer_z(i, p)
+    top = z + p.tunnel_h + p.tunnel_roof + p.latch_tab + 1
+    return prism(crossbar_plan(p), z - 0.1, top).union(box(lx["left"], lx["wall_l"] - p.latch_slit, ly["anchor"], ly["face"], z - 0.1, top)).union(
+        box(lx["right"], lx["end"], ly["anchor"], ly["face"], z - 0.1, top))
 
 
 def div_ribs(i, p=P):
@@ -676,21 +792,30 @@ def div_ribs(i, p=P):
 
 
 def make_drawer(i, p=P, pressed=False):
-    """Drawer i, closed. `pressed` bends its stop leaf in, clear of the rail."""
+    """Drawer i, closed. `pressed` lifts its stop latch clear of the ledge's
+    nub, as an adult does to take the drawer out."""
     x0, x1, y0, y1, h = drawer_box(p)
     z = drawer_z(i, p)
     d = box(x0, x1, y0, y1, z, z + h).cut(box(x0 + p.wall, x1 - p.wall, y0 - 0.1, y1 - p.wall, z + p.floor, z + h + 0.1))
-    ly0, ly1 = leaf_y(p)
-    slits = [box(x0 - 0.1, x0 + p.wall + 0.1, y, y + p.leaf_slit, z + h - p.leaf_len, z + h + 0.1) for y in (ly0 - p.leaf_slit, ly1)]
-    d = cut_all(d, slits)
-    nub = stop_nub(i, p)
-    if pressed:
-        leaf = box(x0, x0 + p.wall, ly0, ly1, z + h - p.leaf_len, z + h)
-        d = d.cut(leaf).union(leaf.translate((p.nub_out + 0.2, 0, 0)))
-        nub = nub.translate((p.nub_out + 0.2, 0, 0))
-    for part in [front_plate(i, p), handle(i, p), pocket_post(i, p), nub] + div_ribs(i, p):
+    for part in [front_plate(i, p), handle(i, p), pocket_post(i, p), latch_strip(i, p)] + div_ribs(i, p):
         d = d.union(part)
-    return d.cut(pocket(i, p)).cut(face_shape(i, p))
+    chan, slits, ramp = latch_cuts(i, p)
+    d = d.cut(chan).cut(ramp)
+    for slit in slits:  # they meet at the corners, so one at a time
+        d = d.cut(slit)
+    d = d.cut(pocket(i, p)).cut(face_shape(i, p))
+    if pressed:
+        leaf = d.intersect(latch_leaf(i, p))
+        d = d.cut(latch_leaf(i, p)).union(leaf.translate((0, 0, p.latch_lift)))
+    return d
+
+
+def drawer_bridges(i, p=P):
+    """Where a drawer, printed upright, has planned flat undersides: the
+    channel's roof, the pocket's floor-level edges."""
+    lx = latch_x(p)
+    z = drawer_z(i, p)
+    return [box(lx["chan"] - 0.2, lx["wall_r"] + 0.2, -p.front_t - 0.2, drawer_box(p)[3] + 0.2, z + p.tunnel_h - 0.2, z + p.tunnel_h + 0.2)]
 
 
 def drawer_at(i, t, p=P, pressed=False):
@@ -754,9 +879,10 @@ def socket(p=P, grow_by=0.0):
 
 
 def notch_angles(p=P):
-    """Notch directions on the head, from the cam direction, where the nub
-    (fixed at +y) sits when locked and when unlocked."""
-    return [(90 - LOCKED) % 360, (90 - UNLOCKED) % 360]
+    """Notch directions on the collar, from the cam direction, where the
+    arm's nub (fixed at +x) sits when unlocked. Locked, it sits on the rod's
+    print flat, which is the other notch."""
+    return [(0 - UNLOCKED) % 360]
 
 
 def make_rod(angle, p=P):
@@ -766,16 +892,24 @@ def make_rod(angle, p=P):
     zh = zm - p.head_len
     rod = rod_body(p.rod_r, z0, zh - p.flange_t, p)
     rod = rod.union(cyl(p.flange_r, zh - p.flange_t, zh)).union(cyl(p.head_r, zh, zm))
-    rod = rod.union(box(0, p.lug_r, -p.lug_w / 2, p.lug_w / 2, zh - p.lug_h, zh))
+    c0, c1 = collar_z(p)
+    rod = rod.union(cyl(p.collar_r, c0, c1))
     for i in range(p.bays):
-        c0, c1 = cam_span(i, p)
-        tip = p.cam_r - p.cam_w / 2
-        rod = rod.union(box(0, tip, -p.cam_w / 2, p.cam_w / 2, c0, c1)).union(cyl(p.cam_w / 2, c0, c1, tip, 0))
-    notch_c = p.head_r + p.notch_r - (p.det_press + 0.1)
-    notches = [cyl(p.notch_r, zh - 0.1, zm + 0.1, notch_c * math.cos(math.radians(a)), notch_c * math.sin(math.radians(a))) for a in notch_angles(p)]
+        a0, a1 = cam_span(i, p)
+        rod = rod.union(box(0, p.cam_r, -p.cam_w / 2, p.cam_w / 2, a0, a1))
+    notches = [turn(prism(collar_notch(p), c0 - 0.1, c1 + 0.1), a) for a in notch_angles(p)]
     f = rod_flat(p)
     rod = cut_all(rod, [socket(p)] + notches).cut(box(-20, -f, -20, 20, 0, p.height + 10))
     return turn(rod, angle).translate((*rod_xy(p), 0))
+
+
+def collar_notch(p=P):
+    """A 90 degree V cut into the collar along +x, deep enough to cradle the
+    nub clear of its sides. A V's sides are 45 degrees, so it prints on the
+    rod's side."""
+    apex = p.collar_r - p.det_press - p.nub_r * (math.sqrt(2) - 1) - 0.2
+    far = p.collar_r + 2.0
+    return [(apex, 0), (far, far - apex), (far, apex - far)]
 
 
 def flange_top(p=P):
@@ -789,15 +923,11 @@ def rod_reach(p=P):
 
 
 def socket_wall(p=P):
-    """Thinnest wall between a socket lobe and a detent notch or the flat."""
-    nc = p.head_r + p.notch_r - (p.det_press + 0.1)
-    walls = []
+    """Thinnest wall round the socket: to the head's rim or its flat."""
+    walls = [p.head_r - p.lobe_at - p.lobe_r]
     for a in p.lobe_a:
-        lx, ly = p.lobe_at * math.cos(math.radians(a)), p.lobe_at * math.sin(math.radians(a))
+        lx = p.lobe_at * math.cos(math.radians(a))
         walls.append(lx - p.lobe_r + rod_flat(p))
-        for n in notch_angles(p):
-            nx, ny = nc * math.cos(math.radians(n)), nc * math.sin(math.radians(n))
-            walls.append(math.hypot(lx - nx, ly - ny) - p.lobe_r - p.notch_r)
     return min(walls)
 
 
@@ -839,7 +969,7 @@ def badge_tube_bottom(p=P):
 
 
 def make_badge(p=P):
-    """The lock badge in place on top: plate, keyhole tube and detent leaf."""
+    """The lock badge in place on top: plate and keyhole tube."""
     x, y = rod_xy(p)
     top = p.height + p.badge_t
     bx0, bx1 = x + p.badge_x[0], x + p.badge_x[1]
@@ -848,31 +978,15 @@ def make_badge(p=P):
     ro = p.bore_r + p.tube_wall
     zt = badge_tube_bottom(p)
     b = plate.union(cyl(ro, zt, p.height + 0.1, x, y))
-    # Leaf: two slits in the tube wall at +y, free at the bottom, cut well
-    # into the bore so no web joins the leaf to the tube
-    slits = [box(sx, sx + 0.6, y + p.bore_r - 1.0, y + ro + 0.1, zt - 0.1, p.height - p.cap) for sx in (x - p.det_w / 2 - 0.6, x + p.det_w / 2)]
     holes = [cyl(p.bore_r, zt - 0.1, top + 0.1, x, y)]
     for sx, sy in screw_xy(p):
         holes += [cyl(p.screw_clear / 2, p.height - 0.1, top + 0.1, sx, sy).union(cyl(p.cbore_r, top - p.cbore_d, top + 0.1, sx, sy))]
-    b = cut_all(cut_all(b, holes), slits)  # the slits run into the bore
-    b = b.union(cyl(p.nub_r, zt, mouth_z(p), x, y + p.bore_r))
-    b = b.union(tooth(p))
+    b = cut_all(b, holes)
     r = 9.5
     icons = padlock(x - r, y, top, True, p) + padlock(x, y + r - 2.0, top, False, p)
     for g in icons:
         b = b.cut(g)
     return b
-
-
-def tooth(p=P):
-    """Hangs from the tube just counter-clockwise of the lug at locked, so a
-    pull on a locked drawer cannot turn the rod."""
-    x, y = rod_xy(p)
-    (r0, r1), (a0, a1) = p.tooth_r, p.tooth_a
-    arc = [(r0, a0), (r1, a0), (r1, (a0 + a1) / 2), (r1, a1), (r0, a1), (r0, (a0 + a1) / 2)]
-    pts = [(x + r * math.cos(math.radians(a)), y + r * math.sin(math.radians(a))) for r, a in arc]
-    zt = badge_tube_bottom(p)
-    return prism(pts, flange_top(p) - p.lug_h, zt + 0.1)
 
 
 def badge_bridges(p=P):

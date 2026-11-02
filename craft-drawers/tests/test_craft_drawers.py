@@ -82,8 +82,8 @@ def test_fork_near_every_cam():
         assert min(abs((z0 + z1) / 2 - zf) for zf in cd.fork_zs()) <= cd.pitch() / 2 + 1
 
 
-def test_rail_stops_at_travel():
-    assert cd.nub_front_y() - cd.stop_y() == pytest.approx(cd.travel_stop())
+def test_latch_stops_at_travel():
+    assert cd.latch_y()["face"] - cd.latch_nub_y() == pytest.approx(cd.travel_stop())
 
 
 # --- Drawers ----------------------------------------------------------------
@@ -161,7 +161,7 @@ def test_drawer_and_divider_print(drawers):
     for i, d in enumerate(drawers):
         part = cd.drawer_print(d, i)
         assert max(size(part)) <= P.bed
-        assert cd.overhang_area(part) < 5.0
+        assert cd.overhang_area(part, allow=[cd.drawer_print(z, i) for z in cd.drawer_bridges(i)]) < 5.0
     assert cd.overhang_area(cd.divider_print(cd.make_divider())) < 1.0
 
 
@@ -204,9 +204,12 @@ def test_unlocked_frees_every_drawer(frame, rod_unlocked):
 
 
 def test_turn_is_clear_with_drawers_shut(frame, drawers):
+    # clear everywhere but the click, which presses on the collar mid-turn
+    z0, z1 = cd.collar_z()
+    no_click = frame.cut(cd.box(-200, 200, -10, 300, z0, z1))
     for a in range(cd.UNLOCKED, cd.LOCKED + 1, 10):
         rod = cd.make_rod(a)
-        assert overlap(frame, rod) < EPS
+        assert overlap(no_click, rod) < EPS
         assert all(overlap(rod, d) < EPS for d in drawers)
 
 
@@ -217,10 +220,17 @@ def test_reinserting_while_locked_stops_short(rod_locked, rod_unlocked):
 
 
 def test_rod_drops_in_only_at_insertion_angle(frame, rod_locked, rod_unlocked):
+    # in with the cams pointing back, through the forks' slots
     for dz in range(0, 260, 10):
-        assert overlap(frame, rod_locked.translate((0, 0, dz))) < EPS
+        assert overlap(frame, rod_unlocked.translate((0, 0, dz))) < EPS
     dz = cd.pitch() - P.cam_z - P.cam_h / 2 - P.ledge_t / 2  # cams level with the forks above
-    assert overlap(frame, rod_unlocked.translate((0, 0, dz))) > EPS
+    assert overlap(frame, rod_locked.translate((0, 0, dz))) > EPS
+
+
+def test_rod_goes_in_with_the_drawers_in_place(drawers, rod_unlocked):
+    for dz in range(0, 260, 10):
+        rod = rod_unlocked.translate((0, 0, dz))
+        assert all(overlap(rod, d) < EPS for d in drawers)
 
 
 def test_badge_covers_slot_and_seats(frame, badge, rod_locked):
@@ -230,9 +240,15 @@ def test_badge_covers_slot_and_seats(frame, badge, rod_locked):
     assert cd.covers(badge, *cd.slot(), z=P.height + 0.5, holes=[bore])
 
 
-def test_detent_presses_between_positions(badge, rod_unlocked):
-    assert overlap(badge, rod_unlocked) < EPS
-    assert overlap(badge, cd.make_rod((cd.LOCKED + cd.UNLOCKED) // 2)) > EPS
+def test_click_presses_between_positions(frame, rod_locked, rod_unlocked):
+    # the frame's arm rests in the collar's notch unlocked, on its flat locked,
+    # and is pushed back in between
+    assert overlap(frame, rod_unlocked) < EPS and overlap(frame, rod_locked) < EPS
+    assert overlap(frame, cd.make_rod((cd.LOCKED + cd.UNLOCKED) // 2)) > EPS
+
+
+def test_hard_stop_just_past_unlocked(frame):
+    assert overlap(frame, cd.make_rod(cd.UNLOCKED - 15)) > EPS
 
 
 def test_rod_cannot_lift_out_of_its_socket(badge, rod_locked):
@@ -302,19 +318,15 @@ def test_fit_test_parts_fit():
 # --- Review fixes -----------------------------------------------------------
 
 
-def test_pulling_a_locked_drawer_cannot_turn_the_rod(frame, badge):
-    # a pull on the tab turns the cam counter-clockwise, away from unlocked,
-    # into a hard stop just past locked
+def test_pulling_a_locked_drawer_cannot_turn_the_rod(frame):
+    # a pull on the pocket turns the cam counter-clockwise, away from
+    # unlocked, into a post in the frame right in front of every cam
     assert (cd.UNLOCKED - cd.LOCKED) % 360 > 180  # unlocking turns clockwise
-    for a in (cd.LOCKED + 10, cd.LOCKED + 20, cd.LOCKED + 30):
+    for a in (cd.LOCKED + 8, cd.LOCKED + 20):
         rod = cd.make_rod(a)
-        assert overlap(badge, rod) + overlap(frame, rod) > EPS
-
-
-def test_detent_leaf_is_cut_free(badge):
-    x, y = cd.rod_xy()
-    zone = cd.box(x - 8, x + 8, y - 8, y + 8, 239.9, 240.1)
-    assert len(badge.intersect(zone).solids().vals()) >= 2
+        for i in range(P.bays):
+            z0, z1 = cd.cam_span(i)
+            assert overlap(frame.intersect(cd.box(-200, 200, -10, 300, z0, z1)), rod) > EPS
 
 
 def test_rod_turns_with_clearance_in_forks():
@@ -329,14 +341,10 @@ def test_socket_walls():
     assert cd.socket_wall() >= 0.9
 
 
-def test_stop_holds_with_drawer_pushed_sideways(frame):
-    play = cd.side_play()
-    assert play <= 0.6
-    assert overlap(frame, cd.drawer_at(1, cd.travel_stop() + 1.0).translate((play, 0, 0))) > EPS
-
-
-def test_stop_leaf_is_short_and_wide():
-    assert P.leaf_len <= 30.0 and P.leaf_w >= 20.0
+@pytest.mark.parametrize("dx", [-0.5, 0.5])
+def test_stop_holds_with_drawer_pushed_sideways(frame, dx):
+    # the nub runs in a channel under the drawer, so the drawer can't dodge it
+    assert overlap(frame, cd.drawer_at(1, cd.travel_stop() + 1.0).translate((dx, 0, 0))) > EPS
 
 
 def test_top_drawer_clear_of_screw_bosses():
@@ -365,22 +373,21 @@ def test_locked_drawer_is_caught_within_8_mm(rod_locked):
         assert overlap(rod_locked, cd.drawer_at(i, 8.0)) > EPS
 
 
-@pytest.mark.parametrize("a", [0, 5, 10, 15, 20])
-def test_locked_drawer_stays_caught_as_the_rod_twists(a):
-    # a pull turns the rod counter-clockwise into its stop (about 10 degrees)
-    # and the rod twists a little more along its length under a hard yank
+@pytest.mark.parametrize("a", [0, 4, 8])
+def test_locked_drawer_stays_caught_as_the_rod_turns_to_its_stop(a):
+    # a pull turns the rod counter-clockwise until each cam meets its post,
+    # about 6 degrees past locked
     rod = cd.make_rod(cd.LOCKED + a)
     for t in (8.0, 15.0, 40.0):
         assert overlap(rod, cd.drawer_at(0, t)) > EPS
 
 
-def test_stop_halts_the_rod_before_the_cam_lets_go(badge):
-    assert overlap(badge, cd.make_rod(cd.LOCKED + 12)) > EPS
+def test_stop_halts_the_rod_before_the_cam_lets_go(frame):
+    assert overlap(frame, cd.make_rod(cd.LOCKED + 8)) > EPS
 
 
 def test_back_stop_catch_is_deep():
-    assert cd.stop_catch() >= 2.5
-    assert cd.stop_catch() - cd.side_play() >= 2.0
+    assert P.latch_nub_h >= 2.0 and P.latch_lift > P.latch_nub_h
 
 
 # --- Mini chest: one drawer, to try the mechanism before the full print -------
@@ -409,8 +416,9 @@ def test_mini_is_small_and_cheap(mini):
 def test_mini_keeps_the_mechanism_sizes():
     # everything that moves, catches or clicks is the full chest's
     for name in ("rod_r", "rod_dx", "rod_y", "cam_r", "cam_w", "cam_h", "cam_z", "pocket_clr", "head_r", "bore_r", "key_depth",
-                 "lug_r", "tooth_r", "tooth_a", "det_press", "nub_r", "notch_r", "leaf_w", "leaf_len", "nub_out", "rail_out",
-                 "gap_left", "guide", "rib", "rib_w", "div_slot", "div_t", "handle_out", "bar_t", "bar_h", "front_t", "wall"):
+                 "collar_r", "collar_h", "arm_t", "arm_len", "det_press", "nub_r", "latch_hinge_w", "latch_len",
+                 "latch_nub_h", "latch_lift", "gap_left", "rib", "rib_w", "div_slot", "div_t", "handle_out", "bar_t", "bar_h",
+                 "front_t", "wall"):
         assert getattr(M, name) == getattr(P, name), name
     assert cd.pitch(M) == cd.pitch(P)
 
@@ -432,7 +440,7 @@ def test_mini_drawer_runs_and_stops(mini):
     for t in (10, cd.travel_stop(M) - 1):
         assert overlap(f, cd.drawer_at(0, t, M)) < EPS
     assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M)) > EPS
-    assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M).translate((cd.side_play(M), 0, 0))) > EPS
+    assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M).translate((0.5, 0, 0))) > EPS
     assert overlap(f, cd.drawer_at(0, cd.travel_stop(M) + 1, M, pressed=True)) < EPS
 
 
@@ -440,7 +448,7 @@ def test_mini_lock_holds_and_frees(mini):
     locked, unlocked = mini["locked"], mini["unlocked"]
     assert overlap(mini["frame"], locked) < EPS and overlap(mini["frame"], unlocked) < EPS
     assert overlap(locked, mini["drawer"]) < EPS
-    for a in (0, 10, 20):
+    for a in (0, 4, 8):  # out to the post
         assert overlap(cd.make_rod(cd.LOCKED + a, M), cd.drawer_at(0, 8.0, M)) > EPS
     for t in (0, 30, cd.travel_stop(M) - 1):
         assert overlap(unlocked, cd.drawer_at(0, t, M)) < EPS
@@ -453,10 +461,14 @@ def test_mini_open_drawer_blocks_the_key():
 
 
 def test_mini_turn_clear_and_stopped(mini):
+    z0, z1 = cd.collar_z(M)
+    no_click = mini["frame"].cut(cd.box(-200, 200, -10, 300, z0, z1))
     for a in range(cd.UNLOCKED, cd.LOCKED + 1, 15):
         rod = cd.make_rod(a, M)
-        assert overlap(mini["frame"], rod) < EPS and overlap(mini["drawer"], rod) < EPS
-    assert overlap(mini["badge"], cd.make_rod(cd.LOCKED + 12, M)) > EPS
+        assert overlap(no_click, rod) < EPS and overlap(mini["drawer"], rod) < EPS
+    assert overlap(mini["frame"], cd.make_rod(cd.LOCKED + 8, M)) > EPS
+    assert overlap(mini["frame"], cd.make_rod(cd.UNLOCKED - 15, M)) > EPS
+    assert overlap(mini["frame"], cd.make_rod(135, M)) > EPS  # the click
 
 
 def test_mini_badge_key_and_rod_fit(mini):
@@ -467,7 +479,7 @@ def test_mini_badge_key_and_rod_fit(mini):
     assert cd.covers(badge, *cd.slot(M), z=M.height + 0.5, holes=[bore])
     assert overlap(locked, cd.make_key(cd.LOCKED, M)) < EPS and overlap(badge, cd.make_key(cd.LOCKED, M)) < EPS
     for dz in range(0, 80, 10):
-        assert overlap(mini["frame"], locked.translate((0, 0, dz))) < EPS
+        assert overlap(mini["frame"], mini["unlocked"].translate((0, 0, dz))) < EPS
 
 
 def test_mini_divider_and_front(mini):
@@ -482,7 +494,7 @@ def test_mini_parts_print(mini):
     parts = cd.mini_parts()
     for name, part in parts.items():
         assert max(size(part)) <= P.bed, name
-    assert cd.overhang_area(parts["mini_drawer"]) < 5.0
+    assert cd.overhang_area(parts["mini_drawer"], allow=[cd.drawer_print(z, 0, M) for z in cd.drawer_bridges(0, M)]) < 5.0
     assert cd.overhang_area(parts["mini_divider"]) < 1.0
 
 
@@ -498,7 +510,7 @@ def test_screw_bosses_grow_from_the_back_wall():
 def test_forks_hold_the_rod_forward_with_a_45_degree_face(rod_locked):
     # the fork's front arm meets the rod on a 45 degree face, so it grows from
     # the ledge when the frame prints on its back, and still takes the pull
-    forks = cd.combo(*[cd.ledges()[k] for k in range(len(cd.ledges())) if k % 3 == 1][1:])
+    forks = cd.combo(*[cd.ledges()[2 * i + 1] for i in range(1, P.bays)])
     assert overlap(forks, rod_locked) < EPS
     assert overlap(forks, rod_locked.translate((0, -1.0, 0))) > EPS
-    assert len(cd.bridge_zones()) == P.bays + 1 + 4  # rail ends, the slot, the bumpers: no fork arms
+    assert len(cd.bridge_zones()) == P.bays + 1 + 4  # rail faces, the slot, the bumpers: no fork arms

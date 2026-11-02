@@ -1,5 +1,56 @@
 # Craft drawers design
 
+## Revision 7 (2026-11-01)
+
+This note supersedes the earlier revisions and the body below where they
+differ. It follows the first fit-test print, where the key turned almost
+freely, and the first strength checks (`fea.py`).
+
+- **The rod stops at every drawer.** A pull on a locked drawer turns the
+  rod counter-clockwise. A post in the frame in front of each cam now stops
+  it about 6 degrees past locked, with brackets above and below each cam
+  tying the post to the side wall. The badge's lug and tooth are gone: the
+  checks put their failure at a 2 to 16 N pull.
+- **The cams are low and square.** Each cam is 8 mm tall, 5 mm above its
+  drawer's underside and clear of the floor boss, with a square tip. Its
+  pocket and post are sized to match.
+- **The rod goes in with its cams pointing back (unlocked).** Each ledge
+  above the bottom bay has a slot round the rod, open toward the back, with
+  a 45 degree point in front that holds the rod against a pull. The rod can
+  go in with the drawers in place.
+- **The click is in the frame.** A springy arm, 40 mm long and 2.2 mm thick,
+  runs front to back beside a collar on the rod, under the badge's tube. Its
+  nub sits in a 90 degree V-notch in the collar when unlocked, and on the
+  rod's print flat when locked. It presses 1 mm in between.
+  - A block beside the top cam stops the key just past unlocked, so both
+    ends of the turn are hard stops.
+  - The badge's tube no longer has a leaf.
+- **The drawer stop is a latch under the floor.** A rail on the left ledge,
+  5 mm wide and 2 mm tall, runs in a covered channel along the drawer's
+  floor. At about two thirds of the way out, the rail's square back end
+  meets a crossbar.
+  - The crossbar hangs on two springy floor strips, 50 mm long, so a pull
+    stretches them along their length.
+  - To take a drawer out, lift the tab on the crossbar. The rail's back has
+    a 45 degree fillet that a bevel on the crossbar clears.
+  - The side-wall leaf, the rails on the frame's walls and the guide ribs
+    are gone. The left gap is back to 2 mm and the left ledge is 20 mm wide.
+- **Strength targets, not yet verified.** Each load-bearing part must hold
+  a 100 N pull on a drawer (`fea.YANK`), against PLA at 20 MPa across its
+  layers and 40 MPa along them. The click must take 30 to 150 N mm to turn
+  past, at no more than 13.3 MPa across the layers. The latch must lift
+  with 15 N or less.
+  - `tests/test_fea.py` checks all of these. The geometry tests pass.
+  - The last full strength run was stopped for lack of memory, after the
+    solver was fixed: it had been returning answers up to ten times too
+    stiff on slender parts.
+  - The numbers from before that fix don't count. Run `uv run fea.py`
+    (or one check at a time, such as `uv run fea.py latch`) and
+    `uv run pytest tests/test_fea.py` on a machine with more memory, then
+    tune whatever misses.
+- **Not yet rechecked:** Bambu Studio's print warnings on the new parts,
+  and the Studio project.
+
 ## Revision 6 (2026-11-01)
 
 - **Bambu Studio flagged both frames with a "floating cantilever".** Both
