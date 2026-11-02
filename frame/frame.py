@@ -41,7 +41,6 @@ class Params:
     # it, round the opening, peeled off before use, held by tabs at its foot
     sup_in: float = 0.8  # from the opening's edge, so its scar is hidden
     sup_w: float = 0.5
-    sup_gap: float = 0.2  # under the lip, like a slicer support's top gap
     tab_w: float = 2.0
     tab_h: float = 0.4  # two layers
     tab_every: float = 50.0
@@ -325,6 +324,10 @@ def peg(x, y, p=P):
     zn = stack_back(p) + p.btn_t + 0.2  # 0.2 under the head
     rh, rise = p.peg_r + p.peg_head, p.peg_head * math.tan(math.radians(50))
     neck = cyl(p.peg_r, pocket_floor(p) - 0.01, zn + 0.01, x, y)
+    # Its root flares at 45 degrees into the pocket floor, below the button
+    d = p.pocket_drop
+    root = cq.Workplane("XY").workplane(offset=pocket_floor(p) - 0.01).center(x, y).circle(p.peg_r + d).workplane(offset=d).circle(p.peg_r).loft()
+    neck = neck.union(root)
     # One loft for the underside and the top, so there is no seam between them
     rings = [cq.Sketch().circle(r).moved(cq.Location(cq.Vector(x, y, z))) for r, z in ((p.peg_r, zn), (rh, zn + rise), (rh, p.depth))]
     return neck.union(cq.Workplane("XY").placeSketch(*rings).loft(ruled=True))
@@ -401,7 +404,7 @@ def lip_support(p=P):
     the button pockets, which cut the rabbet wall away."""
     sw, sh = sight(p)
     a, b = p.sup_in, p.sup_in + p.sup_w
-    z0 = p.skin + p.sup_gap
+    z0 = p.skin - 0.01  # it touches the lip, so the slicer bridges across to it: a gap made it bridge the long way
     wall = box(-sw / 2 - b, sw / 2 + b, -sh / 2 - b, sh / 2 + b, z0, p.depth)
     wall = wall.cut(box(-sw / 2 - a, sw / 2 + a, -sh / 2 - a, sh / 2 + a, z0 - 1, p.depth + 1))
     tabs = []

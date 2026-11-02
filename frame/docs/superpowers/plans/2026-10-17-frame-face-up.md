@@ -538,6 +538,11 @@ Expected: all pass. Report the part sizes from `frame.py` and the plate weights 
 
 ---
 
+### After the first half was printed
+
+- [x] Lip support wall raised to touch the lip (the 0.2 mm gap made the slicer bridge the lip lengthwise).
+- [x] Pegs anchored: six bottom layers, a 45 degree flared root, travel kept off the open pockets. (Pressed-in pins tried and dropped as hard to fit.)
+
 ### Task 6: Print and tune (with the user)
 
 - [ ] Print the "Fit tests" plate. Check: the lip on `test_lock` is flat, its support wall peels off in one piece and leaves no visible scar; the front finish; the pocket floor did not sag onto the button; the button clicks firmly closed and open and presses on the backing; the seam pieces slide together and hold.

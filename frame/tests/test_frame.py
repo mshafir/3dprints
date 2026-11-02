@@ -114,17 +114,28 @@ def test_pegs_start_on_the_bed(body):
 
 
 def test_lip_is_supported_while_printing(body):
-    """A wall one line thick under the lip stops just short of it, inside the
-    opening's edge, and touches the frame only by the tabs at its foot."""
+    """A wall one line thick stands under the lip, inside the opening's edge,
+    touching it so the slicer bridges the lip across to it, and is held at its
+    foot by tabs; nowhere else does it touch the frame."""
     wall = fr.lip_support()
-    tabs = wall.intersect(fr.box(-500, 500, -500, 500, P.depth - P.tab_h, P.depth))
-    assert overlap(wall, body) < tabs.val().Volume() * 0.05  # the tabs' 0.01 mm into the rabbet wall
-    assert overlap(moved(wall, z=-(P.sup_gap + 0.05)), body) > EPS  # raised by the gap, it meets the lip
+    assert overlap(wall, body) > EPS
+    middle = wall.intersect(fr.box(-500, 500, -500, 500, P.skin + 0.01, P.depth - P.tab_h))
+    assert overlap(middle, body) < EPS
     assert overlap(wall, contents()) > EPS  # it stands where the contents go: peeled off first
 
 
 def test_lip_bridge_is_short():
     assert P.lip + P.clr - P.sup_in - P.sup_w <= 4.5
+
+
+def test_pegs_flare_into_the_pocket_floor(body):
+    """Each peg's root widens at 45 degrees into the pocket floor, under the
+    button, so there is no sharp corner where it joins."""
+    for deg, yr, c in fr.locks():
+        x, y = c + fr.btn_x(), yr + P.btn_pivot
+        ring = fr.cyl(P.peg_r + 0.2, fr.pocket_floor() + 0.05, fr.pocket_floor() + 0.1, x, y).cut(fr.cyl(P.peg_r, 0, P.depth, x, y))
+        assert overlap(body, fr.turn(ring, deg)) == pytest.approx(ring.val().Volume(), rel=0.02), (deg, c)
+        assert fr.pocket_floor() + P.pocket_drop <= fr.stack_back() + 1e-9  # below the button
 
 
 def test_bridges_are_short():

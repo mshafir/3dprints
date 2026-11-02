@@ -65,16 +65,23 @@ underside of something:
 
 - **Lip.** It overhangs the rabbet by 4.9 mm. A support wall, one line
   (0.5 mm) thick, stands under the lip all the way round, 0.8 mm in from the
-  opening's edge so its scar is hidden, stopping 0.2 mm short of the lip's
-  underside like a slicer support. The lip prints as a short bridge between
-  the side and the wall. It is held to the half by small tabs at its foot and
-  peels off before the contents go in. About 6 g in all; the slicer's own
-  supports under the lip would be 8 to 12 g and less predictable.
-- **Button pockets.** The peg's top is flush with the back, so it grows from
-  the bed head first; its head's 50 degree underside now faces up. The pocket
-  floor is a bridge, at most 8 mm from the peg to the wall; it is set 0.4 mm
-  further forward than the back of the stack so a little sag does not touch
-  the button.
+  opening's edge so its mark is hidden, and touches the lip, so the slicer
+  bridges the lip across the 4.1 mm to it. The first print left a 0.2 mm gap
+  like a slicer support's: the slicer did not count the wall as an anchor and
+  bridged the lip the long way, stringing. The wall is held to the half by
+  small tabs at its foot and snapped or cut off before the contents go in.
+- **Button pegs.** The peg's top is flush with the back, so it grows from
+  the bed head first; its head's 50 degree underside now faces up. It joins
+  the frame at the pocket floor, a bridge of at most 8 mm from the peg to the
+  wall, 0.4 mm ahead of the back of the stack so a little sag does not touch
+  the button. On the first half one of three pegs printed rough and snapped
+  at the pocket floor when its button went on: behind the floor the frame
+  was only three bottom layers (0.6 mm) over sparse infill. Now the slicer
+  prints six bottom layers (1.2 mm solid), the peg's root flares at 45
+  degrees into the floor within the 0.4 mm under the button, and travel
+  avoids crossing the open pockets, where the peg strung. (Separate pressed-in
+  pins were tried and dropped: hard to fit. A 100% infill modifier round each
+  peg was the first choice, but Studio's command line will not take one.)
 - **Keyholes.** The lips are at the bed; the room for the nail head behind
   them gets a 45 degree gabled roof instead of a flat ceiling.
 - **Dovetails.** The socket's front is already a 45 degree ramp, which is

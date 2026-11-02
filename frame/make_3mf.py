@@ -33,17 +33,21 @@ PROCESS = "0.20mm Standard @BBL X1C"  # the P1S uses the X1C process presets
 
 # Changes from the standard process. The sides are solid in the model; two
 # walls and a light gyroid make them hollow. Five top layers and ironing give
-# the front, printed face up, a flat finish. Arachne prints the lip's 0.5 mm
-# support wall as one line.
+# the front, printed face up, a flat finish. Six bottom layers make the pocket
+# floors, where the pegs join the frame, 1.2 mm of solid plastic rather than a
+# thin skin over infill. Arachne prints the lip's 0.5 mm support wall as one
+# line. Travel stays inside the part rather than crossing the open pockets to
+# the pegs, which strung.
 OVERRIDES = {
     "wall_loops": "2",
     "sparse_infill_density": "10%",
     "sparse_infill_pattern": "gyroid",
     "top_shell_layers": "5",
     "top_shell_thickness": "1",
-    "bottom_shell_layers": "3",
+    "bottom_shell_layers": "6",
     "ironing_type": "topmost",
     "wall_generator": "arachne",
+    "reduce_crossing_wall": "1",
     "enable_support": "0",
     # A brim would also run round the inside of the opening
     "brim_type": "no_brim",
