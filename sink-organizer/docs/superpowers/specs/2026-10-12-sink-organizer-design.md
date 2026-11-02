@@ -1,5 +1,123 @@
 # Sink organizer design
 
+## Revision 6 (2026-11-01): single wide cup
+
+A simpler alternative to the grid organizer, in `sink_cup.py` (tests in
+`tests/test_sink_cup.py`, Studio project `out/sink_cup.3mf`). The grid
+organizer is unchanged and still built.
+
+- No baseplate. One 6 x 3 cell cup (151.9 x 75.7 mm), 100 mm tall from the
+  counter.
+- Wall styled after the reference cup (MakerWorld 741384): close-set round
+  flutes, 1.8 mm deep at about 4 mm pitch (nearly half round), and a wall 3 mm thick at the bottom of the
+  flutes (2 mm round the latches, stepping up at 45 degrees at 24 mm). Over
+  the top 12 mm the whole wall, inside face included, curves 5 mm inward on
+  an arc that ends at 45 degrees, so the inside still prints without
+  support. The flutes run round the curve to the rim, keeping their number,
+  so they narrow and lean slightly toward the middle of each side; the rim
+  is scalloped.
+- Removable base: a smooth, flat-bottomed drip tray with a 2.4 mm floor.
+  The sleeve rests on its 45 degree seat and clicks in with the same snap
+  leaves as the grid cups. All seat, latch, vent and cord heights are the
+  grid organizer's, dropped by 10.1 mm to the thinner floor.
+- Rails for five separators, evenly spaced at 1/6 to 5/6 of the inside
+  length on the front and back walls; any can be left empty, and four are
+  printed. With all five in, the six sections are about 22 mm clear
+  (about 56 mm front to back at the rim). The channels line up with the
+  inside face at the rim, so a separator passes the narrowed opening; below
+  the curve the rails stand 7.5 mm out from the wall. Separators are 2 mm
+  plates resting on stops at 38 mm, so they reach 62% of the way down and the bottom is open end
+  to end for cleaning. Lower stops would run the rails into the top of the
+  cord slot. Clearance 0.3 mm per side in the rails and 0.5 mm at each end.
+  They print lying flat.
+- The 14 mm cord slot is in the back wall at the right, as far right as the
+  flat of the wall allows, mostly under the right-hand section; its left
+  edge passes 1.9 mm under the last separator, which ends above it. The
+  tray drains through it.
+- Vents along the back wall only, skipping the cord slot.
+
+```
+               back
++----+----+----+----+----+----+
+|    :    :    :    :    :cord|
+|    :    :    :    :    :slot|
++----+----+----+----+----+----+
+               front    (: separator places)
+```
+
+Print time, from Bambu Studio's estimate for the sleeve (P1S, 0.20 mm
+standard, 3 walls): 7.0 h with the flutes above; accepted for the look.
+The first version, with the grid cups' wall, took 9.4 h against 3.3 h
+smooth, and 3 mm deep flutes at 8 mm pitch 6.4 h. The
+inner wall loops follow every flute at about 1 mm radius and the crests are
+filled with short solid infill, so the printer never gets up to speed. A
+coarser mesh, faceted flutes and Arachne walls did not help. Measured
+alternatives: 6 mm flutes 6.9 h, 8 mm 6.6 h, 10 mm 5.7 h, V grooves every
+12 mm on a smooth wall 5.2 h, smooth with fuzzy skin 4.3 h, current flutes
+at 0.28 mm layers 7.0 h.
+
+## Revision 5 (2026-10-27)
+
+This note supersedes the earlier revisions and the body below where they differ.
+
+- The charger holder did not fit the real charger. The electric module is
+  now an open fluted cup like the brush cup, 4 x 3 and the same height (100
+  mm above the plate), with no charger fitting: chargers stand loose on the
+  tray floor. Cords leave through one 14 mm slot in the back wall, open at
+  the top of the tray wall and at the bottom of the sleeve, so the cords drop
+  in and the sleeve lowers over them. The tray drains through it. The
+  charger test ring is gone.
+- Every cup top is now an open sleeve resting on the tray seat; the floor
+  and drain-hole code is removed.
+- The bar soap dish is out of this version's layout and exports (still in
+  the script and tested, like the jar holder).
+- Plate is 7 x 3 cells (177.8 x 76.2 mm) with two cups in one row. The
+  brush and toothpaste cups are one 3 x 3 cup split by a 2 mm divider
+  running front to back, 2:1 at the rim: toothbrushes on the left (about
+  44 mm wide), toothpaste on the right (about 22 mm), both about 69 mm deep.
+
+```
+             back
++---------------+-----------+
+|               |      |    |
+|   electric    | brush|pst |
+|     4 x 3     |   3 x 3   |
+|               |      |    |
++---------------+-----------+
+             front
+```
+
+- Vents only in the back wall of each cup (beside the cord slot on the
+  electric cup); the front and sides are unbroken.
+
+## Revision 4 (2026-10-20)
+
+This note supersedes the earlier revisions and the body below where they differ.
+
+- New wall style, after a reference photo of a fluted cup: ribs 1.5 mm deep
+  at about 4 mm pitch, nearly half-round, running the full height with no
+  smooth lip. Over the top 8 mm the outside curves inward 2.5 mm on a
+  quarter ellipse, so the ribs taper and fade into a rolled rim; the inside
+  edge is rounded 0.6 mm. The wall is 2.0 mm at the bottom of each groove
+  and 3.5 mm at the crests. Footprints are unchanged, so insides shrink by
+  0.7 mm per side. The jar holder (not in the layout) uses a 1 mm roll.
+- Single colour throughout. The colour bands are gone from the exports and
+  the Studio project; the three tops share one plate.
+- Brush and toothpaste tops are open sleeves with no floor; they rest on
+  the tray's 45 degree seat (no seat gap) and their trays have no pads. The
+  electric collar keeps its floor on pads, since that floor locates the
+  charger.
+- Latches redesigned again after the printed baseplate test slid in and out
+  with no felt click. The ridge keeps its 45 degree lead-in but its holding
+  face, and the groove's, are now steeper (`latch_hold`, 60 degrees from
+  vertical by default); the groove's holding face is a short overhang no
+  deeper than the ridge. Leaves are 1.2 mm thick (three lines) instead of
+  0.8 and 1.0 mm.
+- Three 1 x 1 latch variants were printed: grip 0.6 mm at 60 degrees,
+  0.8 mm at 60 degrees, and 0.8 mm at 70 degrees. The first felt best and is
+  now the default for every foot (`foot_latch_proud` 0.8, `latch_hold` 60;
+  about 1.7% leaf strain). The 1 x 1 test is back to a single pair.
+
 ## Revision 3 (2026-10-13)
 
 This note supersedes Revision 2 and the body below where they differ.

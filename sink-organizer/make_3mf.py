@@ -1,10 +1,12 @@
 """Bundle the exported STLs into one Bambu Studio project (.3mf) with the print
 settings and colours already chosen.
 
-Run `uv run make_3mf.py` from this folder after
-`sink_organizer.py` has written out/. It drives the Bambu Studio flatpak from
-the command line, so the project is written by Studio itself, as
-out/sink_organizer.3mf: one plate per group of parts, in two filaments.
+Run `uv run make_3mf.py` from this folder after `sink_organizer.py` and
+`sink_cup.py` have written out/. It drives Bambu Studio from the command line,
+so the projects are written by Studio itself: out/sink_organizer.3mf for the
+grid organizer and out/sink_cup.3mf for the single wide cup. Each has one
+plate per group of parts, all in one filament, and a last plate that shows
+them all assembled.
 """
 
 import json
@@ -26,8 +28,8 @@ MACHINE = "Bambu Lab P1S 0.4 nozzle"
 FILAMENT = "Bambu PLA Basic @BBL P1S 0.4 nozzle"
 PROCESS = "0.20mm Standard @BBL X1C"  # the P1S uses the X1C process presets
 
-# Changes from the standard process. The walls are 2.0 to 2.8 mm thick, so
-# three loops make them solid; the extra top layers close the floors that
+# Changes from the standard process. The walls are 2.0 to 3.5 mm thick, so
+# three loops make them nearly solid; the extra top layers close the floors that
 # hold water.
 OVERRIDES = {
     "wall_loops": "3",
@@ -36,21 +38,13 @@ OVERRIDES = {
     "top_shell_layers": "5",
     "bottom_shell_layers": "4",
     "enable_support": "0",
-    # Each colour change is a single swap at a layer boundary, so a full-height
-    # prime tower is not worth its filament
     "enable_prime_tower": "0",
 }
 
-# Filament slots: grey for the baseplate, the trays and the lips, white for
-# the ribbed sections. Load whatever you like in the AMS and map the slots
-# when you send the print.
-GREY, WHITE = 1, 2
-COLOURS = {GREY: "#8E9089", WHITE: "#FFFFFF"}
-
-
-def top(name):
-    """A cup top: white ribs under a grey lip, as two parts of one object."""
-    return [(f"{name}.band0", WHITE), (f"{name}.band1", GREY)]
+# One filament for everything; the colour is only what Studio shows. Load
+# whatever you like and map the slot when you send the print.
+GREY = 1
+COLOURS = {GREY: "#8E9089"}
 
 
 # Plate name -> objects; an object is a list of (STL name, filament) parts
@@ -58,15 +52,40 @@ def top(name):
 PLATES = {
     # The cheapest check of the click into the baseplate; print this first
     "Latch test 1x1": [[(n, GREY)] for n in ("test_plate_1x1", "test_module_1x1")],
-    "Fit tests": [[(n, GREY)] for n in ("test_plate_2x2", "test_cup_tray_2x2", "test_cup_top_2x2", "test_charger_ring")],
+    "Fit tests": [[(n, GREY)] for n in ("test_plate_2x2", "test_cup_tray_2x2", "test_cup_top_2x2")],
     "Baseplate": [[("baseplate", GREY)]],
-    "Trays and grate": [[(n, GREY)] for n in ("brush_cup_tray", "paste_cup_tray", "electric_tray", "soap_tray", "soap_grate")],
-    # One top per plate: their lips are at different heights, so sharing a
-    # plate would swap filament twice a layer while one lip prints.
-    "Brush cup top": [top("brush_cup_top")],
-    "Toothpaste cup top": [top("paste_cup_top")],
-    "Electric collar": [top("electric_collar")],
+    "Trays": [[(n, GREY)] for n in ("electric_cup_tray", "brush_cup_tray")],
+    "Cup tops": [[(n, GREY)] for n in ("electric_cup_top", "brush_cup_top")],
 }
+
+# The single wide cup (sink_cup.py): it has places for five separators; four
+# are printed, on a plate of their own
+CUP_PLATES = {
+    "Tray": [[("cup_tray", GREY)]],
+    "Sleeve": [[("cup_sleeve", GREY)]],
+    "Separators": [[("cup_separator", GREY)]] * 4,
+}
+
+# Last, the whole thing put together, to look at. It is one
+# object made of every real part in its assembled position. It stays printable,
+# because Studio draws objects that are not as colourless ghosts, so skip this
+# plate when slicing.
+ASSEMBLED = "Assembled (not for printing)"
+PLATES[ASSEMBLED] = [
+    [
+        (f"assembled.{stl}", filament)
+        for objects in list(PLATES.values())
+        for parts in objects
+        for stl, filament in parts
+        if not stl.startswith("test_")
+    ]
+]
+CUP_PLATES[ASSEMBLED] = [
+    [(f"assembled.{stl}", GREY) for stl in ("cup_tray", "cup_sleeve")]
+    + [(f"assembled.cup_separator_{i}", GREY) for i in range(1, 6)]
+]
+
+PROJECTS = {"sink_organizer.3mf": PLATES, "sink_cup.3mf": CUP_PLATES}
 
 NOT_SETTINGS = ("name", "type", "instantiation", "inherits", "include")
 
@@ -99,12 +118,12 @@ def write_presets(folder):
     return paths
 
 
-def assemble_list(out):
+def assemble_list(out, plates_by_name):
     """Tell Studio which parts go on which plate, in which filament. Parts
     sharing an assemble_index are merged into one object."""
     plates = []
     index = 0
-    for name, objects in PLATES.items():
+    for name, objects in plates_by_name.items():
         entries = []
         for parts in objects:
             index += 1
@@ -118,11 +137,16 @@ def assemble_list(out):
 
 
 def main(out=Path(__file__).parent / "out"):
-    target = out / "sink_organizer.3mf"
+    for name, plates in PROJECTS.items():
+        build(out / name, plates)
+
+
+def build(target, plates):
+    out = target.parent
     with tempfile.TemporaryDirectory(dir=out) as tmp:
         tmp = Path(tmp)
         presets = write_presets(tmp)
-        (tmp / "assemble.json").write_text(json.dumps(assemble_list(out), indent=1))
+        (tmp / "assemble.json").write_text(json.dumps(assemble_list(out, plates), indent=1))
         if sys.platform == "darwin":
             cmd = [str(MAC_APP)]
         else:
@@ -144,34 +168,24 @@ def main(out=Path(__file__).parent / "out"):
         if result["return_code"] != 0:
             sys.exit(f"{result['error_string']}\n{(run.stdout + run.stderr)[-3000:]}")
     set_colours(target)
-    check(target)
+    check(target, plates)
 
 
 def set_colours(target):
-    """Finish the multi-filament settings the command line leaves incomplete:
-    the display colours and the tables that must have one entry per filament."""
+    """Set the display colour, which the command line leaves at the preset's."""
     with zipfile.ZipFile(target) as z:
         files = {i: z.read(i.filename) for i in z.infolist()}
-    name = "Metadata/project_settings.config"
     for info, data in files.items():
-        if info.filename == name:
+        if info.filename == "Metadata/project_settings.config":
             settings = json.loads(data)
-            n = len(COLOURS)
             settings["filament_colour"] = [COLOURS[k] for k in sorted(COLOURS)]
-            # Per-filament tables the command line leaves sized for one filament
-            for key in ("filament_map", "filament_map_2", "filament_nozzle_map", "filament_volume_map"):
-                if key in settings:
-                    settings[key] = settings[key][:1] * n
-            purge = settings["flush_volumes_matrix"][1]
-            settings["flush_volumes_matrix"] = ["0" if i == j else purge for i in range(n) for j in range(n)]
-            settings["flush_volumes_vector"] = settings["flush_volumes_vector"][:1] * (2 * n)
             files[info] = json.dumps(settings, indent=4).encode()
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as z:
         for info, data in files.items():
             z.writestr(info.filename, data)
 
 
-def check(target):
+def check(target, plates_by_name):
     z = zipfile.ZipFile(target)
     settings = json.loads(z.read("Metadata/project_settings.config"))
     wrong = {k: settings.get(k) for k, v in OVERRIDES.items() if settings.get(k) != v}
@@ -179,6 +193,8 @@ def check(target):
         sys.exit(f"settings not applied: {wrong}")
     model = z.read("Metadata/model_settings.config").decode()
     plates = re.findall(r'<metadata key="plater_name" value="([^"]*)"', model)
+    if plates != list(plates_by_name):
+        sys.exit(f"plates are {plates}, not {list(plates_by_name)}")
     print(f"{target.name}: {len(plates)} plates {plates}")
     print("filament colours:", settings.get("filament_colour"))
 

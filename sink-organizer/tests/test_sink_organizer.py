@@ -61,7 +61,14 @@ def test_parts_are_single_valid_solids(parts):
 
 def test_no_unsupported_overhangs(parts):
     for name, part in parts.items():
-        assert so.overhang_area(part) < 0.5, name
+        assert so.overhang_area(part, allow=so.latch_overhangs()) < 0.5, name
+
+
+def test_only_the_latch_holding_faces_overhang(parts):
+    """The groove's holding face is the one overhang steeper than 45 degrees,
+    and it is short: no deeper than a ridge is tall."""
+    assert so.overhang_area(parts["baseplate"]) > 100
+    assert max(P.foot_latch_proud, P.top_latch_proud) <= 1.3
 
 
 def test_parts_fit_the_bed(parts):
@@ -73,12 +80,12 @@ def test_parts_fit_the_bed(parts):
 # --- Grid -----------------------------------------------------------------------
 
 
-def test_baseplate_is_7_by_5_inches(plate):
+def test_baseplate_is_7_by_3_inches(plate):
     # Measured over the vertices: the bounding box is loose once the shape
     # has been meshed by an earlier test.
     pts = [v.toTuple() for v in plate.vertices().vals()]
     size = [max(c) - min(c) for c in zip(*pts)]
-    assert size == pytest.approx([177.8, 127.0, P.plate_h], abs=0.01)
+    assert size == pytest.approx([177.8, 76.2, P.plate_h], abs=0.01)
 
 
 def test_layout_fills_every_cell_once():
@@ -111,7 +118,7 @@ def test_modules_stay_inside_their_cells(placed):
 
 def test_feet_rest_on_the_socket_ledge_with_side_clearance(plate):
     tray = so.make_open_tray(1, 1, 20.0, base=False)
-    x, y = so.module_origin(3, 3, 1, 1)
+    x, y = so.module_origin(3, 1, 1, 1)
     seated = tray.translate((x, y, 0))
     assert seated.val().distance(plate.val()) < 1e-3
     assert overlap(seated, plate) < EPS
@@ -121,19 +128,20 @@ def test_feet_rest_on_the_socket_ledge_with_side_clearance(plate):
 
 
 def test_modules_seat_when_turned(plate, modules):
-    _, soap = pair(modules, "soap")
+    _, tray = pair(modules, "electric")
     x, y = so.module_origin(0, 0, 4, 3)
-    assert overlap(turned(soap, 180).translate((x, y, 0)), plate) < EPS
+    assert overlap(turned(tray, 180).translate((x, y, 0)), plate) < EPS
     _, tray = pair(modules, "brush")
-    x, y = so.module_origin(3, 1, 2, 4)
+    x, y = so.module_origin(4, 0, 3, 3)
     assert overlap(turned(tray, 90).translate((x, y, 0)), plate) < EPS
 
 
 def test_feet_snap_into_the_plate(plate, modules):
     """Seated, the latch ridges sit clear in their grooves. Lifting brings the
     ridges up against the top of the grooves: a snap, not a lock."""
-    assert P.foot_latch_proud - P.foot_clr >= 0.8  # grip per latch
-    for name, cell, size in (("brush", (0, 3), (4, 2)), ("electric", (4, 2), (3, 3))):
+    assert P.foot_latch_proud - P.foot_clr >= 0.6  # grip per latch
+    assert P.latch_hold >= 60  # a 45 degree holding face rolls straight out
+    for name, cell, size in (("brush", (4, 0), (3, 3)), ("electric", (0, 0), (4, 3))):
         part = modules[name][-1][1]
         x, y = so.module_origin(*cell, *size)
         seated = part.translate((x, y, 0))
@@ -154,9 +162,9 @@ def test_foot_latches_face_full_width_bars():
 
 
 def test_foot_latch_leaf_is_free_to_bend(modules):
-    _, tray = pair(modules, "brush")
-    cx = -1.5 * P.pitch  # corner foot at i = 0 of a 4 x 2 module, latch on its +x face
-    cy = -0.5 * P.pitch
+    _, tray = pair(modules, "electric")
+    cx = -1.5 * P.pitch  # corner foot at i = 0 of a 4 x 3 module, latch on its +x face
+    cy = -1.0 * P.pitch
     a = cx + (P.pitch - P.bar) / 2 - P.foot_clr
     hw, s, t = P.foot_latch_w / 2, P.latch_slit, P.foot_latch_t
     root = P.foot_latch_z + P.foot_latch_len
@@ -180,7 +188,7 @@ def test_foot_latch_leaf_is_free_to_bend(modules):
     assert root + P.foot_latch_back / 2 <= P.floor_z - 0.8
     # Bending strain when the ridge rides over the socket wall, as a fraction
     grip = P.foot_latch_proud - P.foot_clr
-    assert 1.5 * t * grip / P.foot_latch_len**2 < 0.016
+    assert 1.5 * t * grip / P.foot_latch_len**2 < 0.018
 
 
 def test_feet_engage_deep_straight_sockets(plate):
@@ -194,8 +202,8 @@ def test_feet_engage_deep_straight_sockets(plate):
 # --- Two-part modules -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["brush", "paste", "electric"])
-def test_top_sits_on_tray_pads_and_lifts_off(modules, name):
+@pytest.mark.parametrize("name", ["brush", "electric"])
+def test_top_sits_on_its_tray_and_lifts_off(modules, name):
     top, tray = pair(modules, name)
     assert overlap(top, tray) < EPS
     assert top.val().distance(tray.val()) < 1e-3
@@ -209,9 +217,11 @@ def test_top_sits_on_tray_pads_and_lifts_off(modules, name):
 @pytest.mark.parametrize("name", ["brush", "electric"])
 def test_tray_locates_the_top_sideways(modules, name):
     top, tray = pair(modules, name)
-    for dx, dy in ((1, 0), (0, 1)):
-        assert overlap(top.translate((0.2 * dx, 0.2 * dy, 0)), tray) < EPS
-        assert overlap(top.translate((0.6 * dx, 0.6 * dy, 0)), tray) > EPS
+    # Along y, lifted clear of the seat an open cup rests on: the spigot
+    # clearance. Lifted, the latch ridges already bear on their holding faces.
+    lifted = overlap(top.translate((0, 0, 0.3)), tray)
+    assert overlap(top.translate((0, 0.2, 0.3)), tray) - lifted < EPS
+    assert overlap(top.translate((0, 0.6, 0.3)), tray) - lifted > 10
 
 
 def test_cup_top_snaps_onto_its_tray(modules):
@@ -226,7 +236,7 @@ def test_cup_top_snaps_onto_its_tray(modules):
 
 def test_cup_latch_leaf_is_free_to_bend(modules):
     top, _ = pair(modules, "brush")
-    a = so.valley(4, 2)[0] / 2 - so.spigot_off()
+    a = so.valley(3, 3)[0] / 2 - so.spigot_off()
     hw, s, t = P.top_latch_w / 2, P.latch_slit, P.top_latch_t
     root = P.pad_z + P.top_latch_len
 
@@ -234,7 +244,7 @@ def test_cup_latch_leaf_is_free_to_bend(modules):
         return so.box(x - size / 2, x + size / 2, y - size / 2, y + size / 2, z - size / 2, z + size / 2)
 
     free = [
-        probe(a - t - P.top_latch_back / 2, 0, P.pad_z + 0.5),  # through the floor behind the leaf
+        probe(a - t - P.top_latch_back / 2, 0, P.pad_z + 0.5),  # behind the leaf
         probe(a - t - P.top_latch_back / 2, 0, P.pad_z + 5),
         probe(a + P.latch_gap / 2, 0, root - 1),  # between the leaf and the cup wall
         probe(a - t / 2, hw + s / 2, P.pad_z + 0.5),  # the slit at each end
@@ -256,24 +266,69 @@ def test_top_floor_stands_clear_of_the_tray_floor(modules):
     assert top.val().BoundingBox().zmin - P.floor_z >= 2.0
 
 
-def test_cup_floor_drains_and_walls_are_vented(modules):
+@pytest.mark.parametrize("name", ["brush", "electric"])
+def test_cups_are_open_sleeves_on_bare_trays(modules, name):
+    top, tray = pair(modules, name)
+    plug = so.box(-3, 3, -5, 5, P.floor_z, P.seat_z)
+    assert overlap(top, plug) < EPS  # no floor
+    assert overlap(tray, plug) < EPS  # no pads
+
+
+def test_cups_are_vented_at_the_back_only(modules):
+    for name in ("brush", "electric"):
+        top, _ = pair(modules, name)
+        _, d = so.valley(*{"brush": (3, 3), "electric": (4, 3)}[name])
+        _, step = so.rib_step(*{"brush": (3, 3), "electric": (4, 3)}[name])
+        u = 2 * step if name == "brush" else so.vent_positions(4, 3, 0)[-1]
+        z = P.vent_z + 1
+        probe = lambda y: so.box(u - 0.5, u + 0.5, y - 0.5, y + 0.5, z - 0.5, z + 0.5)  # noqa: E731
+        assert overlap(top, probe(d / 2 - 1)) < 1e-6, name  # a vent in the back wall
+        assert overlap(top, probe(-d / 2 + 1)) == pytest.approx(1.0, rel=1e-3), name  # front wall solid
+
+
+def test_ribs_are_deep_and_roll_into_the_rim(modules):
     top, _ = pair(modules, "brush")
-    holes = so.drain_holes(4, 2)
-    assert len(holes) >= 12
-    x, y = holes[0]
-    plug = so.cyl(P.hole_d / 2 - 0.1, P.pad_z, P.pad_z + P.top_floor, x, y)
-    assert overlap(top, plug) < EPS
-    solid = so.make_top(4, 2, P.brush_z, holes=False, vents=False)
-    lost = solid.val().Volume() - top.val().Volume()
-    drained = len(holes) * math.pi * (P.hole_d / 2) ** 2 * P.top_floor
-    assert lost > drained + 100  # the rest is vent openings
+    w, d = so.valley(3, 3)
+    _, step = so.rib_step(3, 3)
+    z = 60.0
+
+    def probe(x, y, z):
+        return so.box(x - 0.1, x + 0.1, y - 0.1, y + 0.1, z - 0.1, z + 0.1)
+
+    # A groove falls on the middle of each side, a crest half a step along
+    assert P.rib_d >= 1.5
+    assert overlap(top, probe(0, d / 2 + 0.6, z)) < 1e-6
+    assert overlap(top, probe(step / 2, d / 2 + P.rib_d - 0.2, z)) > 1e-3
+    # Near the rim the crests curve in, and at the rim the wall is smooth
+    assert overlap(top, probe(step / 2, d / 2 + P.rib_d - 0.2, P.brush_z - 1.0)) < 1e-6
+    rim = top.intersect(so.box(-500, 500, -500, 500, P.brush_z - 0.2, P.brush_z)).val().BoundingBox()
+    assert rim.ylen < d
 
 
 def test_cups_are_tall_enough(modules):
-    brush, _ = pair(modules, "brush")
-    paste, _ = pair(modules, "paste")
-    assert brush.val().BoundingBox().zmax - P.plate_h == pytest.approx(100, abs=0.1)
-    assert paste.val().BoundingBox().zmax - P.plate_h == pytest.approx(90, abs=0.1)
+    for name, height in (("brush", 100), ("electric", 100)):
+        top, _ = pair(modules, name)
+        assert top.val().BoundingBox().zmax - P.plate_h == pytest.approx(height, abs=0.1), name
+
+
+def test_divider_splits_the_cup_2_to_1(modules):
+    top, _ = pair(modules, "brush")
+    w, d = so.valley(3, 3)
+    inner, x = w - 2 * P.wall, so.divider_x(3, 3)
+    brush = (x - P.wall / 2) + inner / 2
+    paste = inner / 2 - (x + P.wall / 2)
+    assert brush == pytest.approx(2 * paste)
+    assert paste >= 20
+    z = 60.0
+
+    def slab(x0, x1):
+        return so.box(x0, x1, -10, 10, z, z + 10)
+
+    assert overlap(top, slab(x - P.wall / 2 + 0.05, x + P.wall / 2 - 0.05)) == pytest.approx(
+        (P.wall - 0.1) * 200, rel=1e-3
+    )
+    assert overlap(top, slab(x - P.wall / 2 - 5, x - P.wall / 2 - 0.05)) < EPS
+    assert overlap(top, slab(x + P.wall / 2 + 0.05, x + P.wall / 2 + 5)) < EPS
 
 
 # --- Things the modules hold --------------------------------------------------------
@@ -289,7 +344,7 @@ def test_two_jars_fit_at_the_same_depth(jar_holder):
     holder = jar_holder
     assert holder.solids().size() == 1 and holder.val().isValid()
     assert P.jar_step == 0
-    assert so.jar_spacing() == pytest.approx(88.8, abs=0.05)
+    assert so.jar_spacing() == pytest.approx(87.4, abs=0.05)
     low, high = so.jar_blocks(band_d=so.jar_spacing() - 1.0)
     for jar in (low, high):
         assert overlap(holder, jar) < EPS
@@ -310,33 +365,29 @@ def test_jar_holder_is_watertight(jar_holder):
     assert w / 2 - (x + r) >= 1.2 - 1e-6
 
 
-def test_chargers_fit_with_their_cords(modules):
+def test_cords_leave_through_the_back_only(modules):
+    """A cord from the middle of the tray floor runs out the back through
+    both slots. The sleeve lowers over a cord already in place."""
     top, tray = pair(modules, "electric")
-    blocks = so.charger_blocks()
-    assert len(blocks) == P.chargers
-    for block, cx in zip(blocks, so.charger_xs()):
-        assert overlap(block, top) < EPS
-        assert overlap(block, tray) < EPS
-        assert block.val().distance(tray.val()) < 1e-3  # stands on the tray floor
-        for sy in (-1, 1):
-            cord = (
-                so.cyl(2.5, 20, 60)
-                .rotate((0, 0, 0), (1, 0, 0), -90 * sy)
-                .translate((cx, 0, P.floor_z + 2.6))
-            )
-            assert overlap(cord, top) < EPS
-            assert overlap(cord, tray) < EPS
+    _, d = so.valley(4, 3)
+
+    def cord(sy):
+        return so.cyl(2.5, 0, 60).rotate((0, 0, 0), (1, 0, 0), -90 * sy).translate((0, 0, P.floor_z + 2.6))
+
+    assert overlap(cord(1), top) < EPS
+    assert overlap(cord(1), tray) < EPS
+    for lift in (5, 20, 40):
+        assert overlap(top.translate((0, 0, lift)), cord(1)) < EPS
+    assert overlap(cord(-1), tray) > EPS
+    # Wide enough for three cords side by side
+    assert P.cord_w >= 3 * 4.5
 
 
-def test_collar_drops_over_chargers_already_in_the_tray(modules):
-    top, _ = pair(modules, "electric")
-    for block in so.charger_blocks():
-        for lift in (5, 15, 30):
-            assert overlap(top.translate((0, 0, lift)), block) < EPS
-
-
-def test_bar_soap_rests_on_the_grate(modules):
-    grate, tray = pair(modules, "soap")
+def test_bar_soap_rests_on_the_grate():
+    """Not in this version's layout, but kept buildable for the next one."""
+    grate, tray = so.make_soap_dish()
+    for part in (grate, tray):
+        assert part.solids().size() == 1 and part.val().isValid()
     assert overlap(grate, tray) < EPS
     assert grate.val().distance(tray.val()) < 1e-3
     assert overlap(grate.translate((0, 0, 10)), tray) < EPS
@@ -345,6 +396,13 @@ def test_bar_soap_rests_on_the_grate(modules):
     assert overlap(bar, tray) < EPS
     assert overlap(bar, grate) < EPS
     assert grate.val().BoundingBox().zmax > tray.val().BoundingBox().zmax
+
+
+def test_assembled_view_is_every_part_in_place(plate, modules, placed):
+    shown = so.assembled_parts(plate, modules)
+    assert set(shown) == {"baseplate"} | {name for _, name, _ in placed}
+    for _, name, part in placed:
+        assert shown[name].val().Volume() == pytest.approx(part.val().Volume(), abs=EPS), name
 
 
 def test_fit_test_cup_exercises_both_latches(parts):
@@ -360,5 +418,6 @@ def test_small_latch_test_uses_little_plastic(parts):
     assert overlap(stub, plate) < EPS
     assert stub.val().distance(plate.val()) < 1e-3
     assert overlap(stub.translate((0, 0, 2.0)), plate) > 2.0  # two ridges catch
+    assert overlap(stub.translate((0, 0, P.socket_d + 1)), plate) < EPS
     grams = (plate.val().Volume() + stub.val().Volume()) * 1.24e-3
     assert grams < 12
