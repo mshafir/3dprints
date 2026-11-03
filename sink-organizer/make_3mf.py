@@ -1,10 +1,11 @@
 """Bundle the exported STLs into one Bambu Studio project (.3mf) with the print
 settings and colours already chosen.
 
-Run `uv run make_3mf.py` from this folder after `sink_organizer.py` and
-`sink_cup.py` have written out/. It drives Bambu Studio from the command line,
+Run `uv run make_3mf.py` from this folder after `sink_organizer.py`,
+`sink_cup.py` and `jar_holder.py` have written out/. It drives Bambu Studio from the command line,
 so the projects are written by Studio itself: out/sink_organizer.3mf for the
-grid organizer and out/sink_cup.3mf for the single wide cup. Each has one
+grid organizer, out/sink_cup.3mf for the single wide cup and
+out/jar_holder.3mf for the mason jar holder. Each has one
 plate per group of parts, all in one filament, and a last plate that shows
 them all assembled.
 """
@@ -85,7 +86,15 @@ CUP_PLATES[ASSEMBLED] = [
     + [(f"assembled.cup_separator_{i}", GREY) for i in range(1, 6)]
 ]
 
-PROJECTS = {"sink_organizer.3mf": PLATES, "sink_cup.3mf": CUP_PLATES}
+# The mason jar holder (jar_holder.py): the test ring first, to check the
+# jar's size before the holder
+JAR_PLATES = {
+    "Test ring": [[("jar_test_ring", GREY)]],
+    "Holder": [[("jar_holder", GREY)]],
+    ASSEMBLED: [[(f"assembled.{stl}", GREY) for stl in ("jar_holder", "jar_1", "jar_2")]],
+}
+
+PROJECTS = {"sink_organizer.3mf": PLATES, "sink_cup.3mf": CUP_PLATES, "jar_holder.3mf": JAR_PLATES}
 
 NOT_SETTINGS = ("name", "type", "instantiation", "inherits", "include")
 

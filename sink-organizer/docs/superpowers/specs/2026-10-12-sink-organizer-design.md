@@ -1,5 +1,74 @@
 # Sink organizer design
 
+## Revision 10 (2026-11-03): fits 7 inches of counter
+
+- The holder has to fit 7 in (177.8 mm) of counter; it was 186.5 mm.
+- The user measured the jar rim, threads included, at 87 mm, and no caps go
+  on in the holder, so the rims can stand close. The rims now keep a 1 mm
+  gap (was 3), so the jars sit 88 mm apart.
+- The pockets are another 0.8 mm smaller, 82.2 mm across (`jar_d` 80.2),
+  which the user said the jar takes comfortably.
+- The rim round each pocket is slimmer, 3.8 mm instead of 6.8, agreed with
+  the user: lead-in 1 mm (was 1.5), flat top 0.5 mm (was 1.5), the top curves
+  in 1 mm (was 2) and the flutes are 1.3 mm deep (was 1.8). The rounded top
+  and flutes stay, shallower than the cup's.
+- The holder is 177.7 × 89.8 × 27.4 mm, 0.1 mm under 7 in; a test checks
+  the width. Bambu Studio: 92.6 g and about 3 h 31 min, no warnings.
+- The test ring follows: 88.2 mm across, 8 mm tall, 7.7 g, about 14 min.
+- Next: print the ring. If the jar is snug but loose, print the holder.
+
+## Revision 9 (2026-11-03): smaller pocket, plain test ring
+
+- The first test ring (85 mm pocket) fit with room to spare. The user asked
+  for the pocket 2 mm smaller, so `jar_d` is now 81 (pocket 83 mm, the
+  1 mm clearance kept). The jar spacing follows the lid bands and is
+  unchanged; the holder is 2 mm smaller each way, 186.5 × 96.6 × 27.4 mm.
+- The test ring is now plain: no flutes and no rounded top, just the pocket
+  and its lead-in in a wall 3.5 mm thick, 90 mm across and 8 mm tall.
+  Bambu Studio: 7.9 g and about 16 min, no warnings.
+- Next: print the new ring. If it is snug but loose, print the holder.
+
+## Revision 8 (2026-11-03): mason jar holder
+
+A stand-alone holder for two wide-mouth pint mason jars of retainers in
+peroxide, to stand on the counter beside the single cup. It's in
+`jar_holder.py` (tests in `tests/test_jar_holder.py`, Studio project
+`out/jar_holder.3mf`). The grid organizer's `make_jar_holder` is unchanged.
+
+- Jars are lifted out daily to refill, so they drop in loosely and come out
+  in one motion. They are held against tipping, not clipped. Drips must stay
+  off the counter.
+- What the user decided:
+  - No baseplate.
+  - The single cup's flutes and rounded top.
+  - Flat on top, with two round pockets about 1 inch (25 mm) deep.
+  - Closed floors that catch drips.
+  - A round test ring first.
+- Pockets are sized for a jar body 83 mm across (3¼", the most consistent
+  published figure for a Ball wide-mouth pint), with 1 mm clearance all
+  round. *Not measured.* The test ring is there to confirm it, and changing
+  `jar_d` resizes everything.
+- Each pocket has a 45° lead-in chamfer at the opening and a 2 mm round
+  where the wall meets the floor, so it wipes out. The floor is 2.4 mm.
+- My calls:
+  - The outline is a stadium round the two pockets, so the wall is even and
+    there are no corners full of plastic.
+  - The jars stand far enough apart for 87 mm lid bands to keep a 3 mm gap.
+  - The top curves in 2 mm over about 5 mm, scaled down from the cup's
+    5 mm over 12 mm.
+  - The model is solid, and the slicer fills it with sparse infill.
+- The holder is 188.5 × 98.6 × 27.4 mm. Bambu Studio's estimate: 106 g and
+  2 h 55 min.
+- Test ring: an open ring 8 mm tall with the holder's pocket wall, lead-in,
+  flutes and rounded top. It stands on the counter and the jar's base drops
+  into it. My call: no floor. The jar's rounded heel barely meets the
+  holder's floor, so the diameter is what needs checking, and the floor was
+  more than half the plastic (11.7 g and 26 min instead of 28.7 g and
+  47 min). It slices with no warnings.
+- Next: print the ring and try a jar.
+  - Snug but loose, with no rubbing: print the holder.
+  - Tight: raise `jar_d`. Very loose: lower it.
+
 ## Revision 7 (2026-11-02): softer cup-top leaf
 
 - The single cup's printed tray took the sleeve with a very firm click,
