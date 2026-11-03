@@ -4,6 +4,13 @@ What earlier projects taught about designing, testing and simulating parts
 in this repo. They apply to any project here. Each item names the project
 that taught it.
 
+General knowledge from books and guides lives in [`learnings/`](learnings/):
+
+- [snap-fits.md](learnings/snap-fits.md): sizing snap hooks, latch leaves
+  and detent arms by strain; insertion and pull-out force; our parts checked
+  against the limits.
+- [reading-list.md](learnings/reading-list.md): free sources still to mine.
+
 ## Print orientation comes first
 
 - Pick each part's print orientation before modelling its details. Model
@@ -48,6 +55,9 @@ that taught it.
   tolerances on the bore, the head and the leaf ate the overlap.
   - Use about 1 mm of press, a spring stiff enough to feel, and a notch
     with 45° sides.
+  - Before settling on the press, check the arm's root strain for it
+    ([snap-fits.md](learnings/snap-fits.md)). More press on the same arm
+    can crack it.
   - Put hard stops at both ends of the travel, so each position is
     positive whatever the detent does.
   - Example: craft drawers, the key's click.
@@ -126,8 +136,10 @@ that taught it.
   - Strength: the stress for a 1 N load scales to a breaking load.
   - Stiffness: displacement per newton gives the force for a required
     deflection, such as a detent's press or a latch's lift.
-  - Feel: a detent's torque is about its force times its radius, on a 45°
-    notch.
+  - Feel: a detent's torque is its arm force times its radius, times the
+    ramp factor `(μ + tan α)/(1 − μ tan α)`. On a 45° notch with PLA's
+    μ ≈ 0.5, that factor is about 3, not 1
+    ([snap-fits.md](learnings/snap-fits.md)).
 - Memory: quadratic elements on large crops use a lot of it, and a full
   report can be stopped for lack of it. Crop tight round the part, and run
   checks one at a time: `uv run fea.py latch`.

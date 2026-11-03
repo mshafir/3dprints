@@ -32,6 +32,9 @@ Every project folder has the same shape:
   out/                generated STEP, STL and 3MF files (not in git)
 ```
 
+`LEARNINGS.md` records what the projects taught. `learnings/` holds general
+knowledge from books and design guides, such as sizing snap fits.
+
 At the repo root, `pyproject.toml` pins CadQuery and pytest, `uv.lock` records
 the exact versions of everything they pull in, and one `.venv` is shared by
 all projects.

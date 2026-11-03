@@ -1,5 +1,22 @@
 # Sink organizer design
 
+## Revision 7 (2026-11-02): softer cup-top leaf
+
+- The single cup's printed tray took the sleeve with a very firm click,
+  firm enough that the leaves might crack with repeated use. The leaves now
+  run 16 mm from their free end to where they join the wall (was 13). The
+  ridge still presses 1.9 mm above the free end, so its distance from the
+  root grows from 11.1 to 14.1 mm.
+  - Estimated root strain falls from 1.45% to 0.90%, and the push to click
+    it in to about half.
+  - The holding force also halves. The cost if that's wrong: the sleeve
+    lifts off too easily. If so, go back toward 15 mm (1.04%, about 0.6 of
+    the old force).
+- The ridge, its height and the trays are unchanged (checked: the tray
+  solids are identical), so a tray already printed takes the new sleeve.
+  The grid organizer's cup tops get the same leaf.
+- The leaf test now caps strain at 1% (was 1.5%).
+
 ## Revision 6 (2026-11-01): single wide cup
 
 A simpler alternative to the grid organizer, in `sink_cup.py` (tests in

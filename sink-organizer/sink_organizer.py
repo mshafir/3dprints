@@ -65,7 +65,9 @@ class Params:
     top_latch_w: float = 16.0
     top_latch_proud: float = 1.3  # less spigot_clr is the grip
     top_latch_z: float = 16.8
-    top_latch_len: float = 13.0  # from the cup floor to where the leaf joins the wall
+    top_latch_len: float = 16.0  # from the cup floor to where the leaf joins the wall. Was 13:
+    # the cup clicked in too hard to trust over repeated use (about 1.45% root strain);
+    # 16 roughly halves the push and the strain (about 0.9%). The tray is unaffected.
     top_latch_back: float = 1.6  # room behind the leaf to bend into
     wall: float = 2.0  # at the bottom of the grooves
     corner_r: float = 12.0  # reduced automatically on narrow modules

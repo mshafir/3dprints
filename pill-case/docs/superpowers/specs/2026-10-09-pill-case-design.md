@@ -2,6 +2,16 @@
 
 Date: 2026-10-09 (revision 4: flex-arm door latch and dial lock after first print)
 
+## Next time (2026-11-02)
+
+- The dial latch at revision 13 is printed and holding, and it is opened
+  rarely. It is still the most strained snap in the repo. By a rough
+  straight-arm estimate (see `learnings/snap-fits.md`), 1.8 mm of overlap
+  on a 1.3 mm arm rooted 45 degrees back gives about 2.7% strain, along the
+  printed lines. In the next version, root the arm further back (a larger
+  `latch_root`) or taper it, to bring that toward 2% while keeping the
+  overlap.
+
 ## Revision 13 (2026-10-20) — supersedes everything below where it differs
 
 - The pocket test print showed 3.7 mm fits best, so the pockets are now

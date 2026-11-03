@@ -258,7 +258,8 @@ def test_cup_latch_leaf_is_free_to_bend(modules):
     assert root - P.top_latch_z >= 10.0  # bending length
     # Bending strain when the ridge rides over the tray wall, as a fraction
     grip = P.top_latch_proud - P.spigot_clr
-    assert 1.5 * t * grip / (root - P.top_latch_z) ** 2 < 0.015
+    # Under 1%: at 1.45% (revision 6) the cup clicked in too hard to trust
+    assert 1.5 * t * grip / (root - P.top_latch_z) ** 2 < 0.010
 
 
 def test_top_floor_stands_clear_of_the_tray_floor(modules):
