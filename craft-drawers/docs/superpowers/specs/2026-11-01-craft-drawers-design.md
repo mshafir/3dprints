@@ -1,5 +1,51 @@
 # Craft drawers design
 
+## Revision 8 (2026-11-02)
+
+The first strength run that counts, after the solver fix, and the changes
+it called for. `uv run pytest tests/` passes: 89 tests, about 27 minutes.
+
+- **Results:**
+
+  | Check | First run | Now | Target |
+  |---|---|---|---|
+  | `latch` | 66 N | 117 N | 100 N |
+  | `latch_nub` | 96 N | 114 N | 100 N |
+  | `stop_post` | 62 N | 114 N | 100 N |
+  | `pocket_post` | 520 N | 521 N | 100 N |
+  | `cam` | 120 N | 124 N | 100 N |
+  | `click` | 14 N mm, 7.0 MPa | 38 N mm, 10.5 MPa | 30 to 150 N mm, at most 13.3 MPa |
+  | `latch_lift` | 0.4 N, 10.8 MPa | 1.3 N, 19.8 MPa | at most 15 N, at most 26.7 MPa |
+
+- **The latch's strips are 2.4 mm thick, not 1.6.** The crossbar is pushed
+  1.3 to 2.0 mm above the floor, above the thin strips' middle, so a pull
+  bent them. The peak was on the round reliefs at the strips' anchor. The
+  strips now stand 1.2 mm proud of the drawer's floor along its left side.
+- **The ledges are 2.0 mm thick, not 1.6.** The latch's rail bent the ledge
+  under it, peaking at the foot of the rail's fillet. There is only 1 mm
+  above the drawer below, and the crossbar's bevel fills the space behind
+  the rail, so the ledges themselves had to get thicker. Each drawer is
+  0.4 mm shorter as a result.
+- **A gusset behind each stop post, under its cam.** The post's back edge
+  met the ledge in a sharp corner that the 7.4 mm bracket didn't reach.
+  The gusset fills the post's whole width: an earlier version, only behind
+  the post's back edge, left a slot beside it and broke at 28 N. Above the
+  gusset, the post's back slopes back to 45 degrees rather than stepping.
+- **The click's arm is 2.8 mm thick and 36 mm long, not 2.2 and 40.** A
+  recess 0.6 mm deep in the side wall behind the arm keeps its room to
+  bend; the wall there is 1.2 mm. The recess can't go deeper without
+  failing the outside-openings check. With a 40 mm arm, no press reached
+  30 N mm under the stress limit.
+- **`fea.py` uses far less memory.** The run had run out of memory because
+  of `fea.py` itself, not because of the parts' size. The multigrid
+  stopping point was too strict, so it fell into a 20 GB direct solve, and
+  leaving out the stresses near a load built a 7 GB table. Each check now
+  takes 1 to 2 minutes at 3 to 7 GB, except `latch_lift`: 16 minutes,
+  11.5 GB.
+- **Not yet rechecked:** Bambu Studio's print warnings on the changed
+  parts, the Studio project, and the mini chest's fit with the new
+  numbers. Print a mini chest to feel the click before the full frame.
+
 ## Revision 7 (2026-11-01)
 
 This note supersedes the earlier revisions and the body below where they
@@ -35,19 +81,12 @@ freely, and the first strength checks (`fea.py`).
     a 45 degree fillet that a bevel on the crossbar clears.
   - The side-wall leaf, the rails on the frame's walls and the guide ribs
     are gone. The left gap is back to 2 mm and the left ledge is 20 mm wide.
-- **Strength targets, not yet verified.** Each load-bearing part must hold
+- **Strength targets.** Each load-bearing part must hold
   a 100 N pull on a drawer (`fea.YANK`), against PLA at 20 MPa across its
   layers and 40 MPa along them. The click must take 30 to 150 N mm to turn
   past, at no more than 13.3 MPa across the layers. The latch must lift
   with 15 N or less.
-  - `tests/test_fea.py` checks all of these. The geometry tests pass.
-  - The last full strength run was stopped for lack of memory, after the
-    solver was fixed: it had been returning answers up to ten times too
-    stiff on slender parts.
-  - The numbers from before that fix don't count. Run `uv run fea.py`
-    (or one check at a time, such as `uv run fea.py latch`) and
-    `uv run pytest tests/test_fea.py` on a machine with more memory, then
-    tune whatever misses.
+  - `tests/test_fea.py` checks all of these.
 - **Not yet rechecked:** Bambu Studio's print warnings on the new parts,
   and the Studio project.
 

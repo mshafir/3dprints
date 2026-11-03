@@ -20,6 +20,7 @@ import gmsh
 import numpy as np
 import pyamg
 import scipy.sparse.linalg as spla
+from scipy.spatial import cKDTree
 from skfem import Basis, ElementTetP2, ElementVector, FacetBasis, LinearForm, MeshTet, asm, condense
 from skfem.helpers import dot, sym_grad
 from skfem.models.elasticity import lame_parameters, linear_elasticity, linear_stress
@@ -80,12 +81,10 @@ class Result:
 
     def away(self, region=None):
         """Mask of stress points outside `region`'s complement and clear of the loads."""
-        pts = self.points.reshape(3, -1)
-        keep = np.ones(pts.shape[1], dtype=bool)
-        for c in np.array_split(self.loaded, max(1, self.loaded.shape[1] // 200), axis=1):
-            d = np.min(np.linalg.norm(pts[:, :, None] - c[:, None, :], axis=0), axis=1)
-            keep &= d > NEAR_LOAD
-        keep = keep.reshape(self.points.shape[1:])
+        # nearest loaded face by k-d tree: a dense table of distances from
+        # every stress point to every loaded face takes gigabytes
+        d, _ = cKDTree(self.loaded.T).query(self.points.reshape(3, -1).T, distance_upper_bound=NEAR_LOAD)
+        keep = (d > NEAR_LOAD).reshape(self.points.shape[1:])
         if region is not None:
             keep &= region(self.points)
         return keep
@@ -167,7 +166,10 @@ def skfem_solve(K, f, D, B):
     A = A.tocsr()
     ml = pyamg.smoothed_aggregation_solver(A, B=B[I], max_coarse=500)
     residuals = []
-    xi = ml.solve(b, tol=1e-10, accel="cg", maxiter=2000, residuals=residuals)
+    # Stop at the residual we accept. Asking for less, such as 1e-10, is
+    # below what rounding allows on these parts: CG reaches 1e-8, drifts
+    # back up, misses the check and falls into a direct solve of 20 GB.
+    xi = ml.solve(b, tol=1e-8, accel="cg", maxiter=2000, residuals=residuals)
     if residuals[-1] > 1e-8 * residuals[0]:
         xi = spla.spsolve(A.tocsc(), b)
     out = np.zeros(K.shape[0])

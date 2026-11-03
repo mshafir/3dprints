@@ -38,7 +38,7 @@ class Params:
     bays: int = 4
 
     # Ledges the drawers run on: a strip on each side wall, no shelves
-    ledge_t: float = 1.6
+    ledge_t: float = 2.0  # 1.6 let the latch rail bend it: 96 N (fea.latch_nub)
     ledge_under: float = 6.0  # how far under the drawer
     ledge_left: float = 20.0  # the left ledge, under the drawer's stop latch
     head_gap: float = 1.0  # drawer top to the ledge above, so a tipped drawer stays put
@@ -105,8 +105,9 @@ class Params:
     # unlocked and onto the rod's print flat when locked.
     collar_r: float = 4.6
     collar_h: float = 22.0
-    arm_t: float = 2.2
-    arm_len: float = 40.0
+    arm_t: float = 2.8  # 2.2 gave 14 N mm, too soft (fea.click)
+    arm_len: float = 36.0
+    arm_relief: float = 0.6  # recess in the side wall behind the arm, so it can bend
     arm_clr: float = 0.4  # collar to the arm
     det_press: float = 1.0
     nub_r: float = 1.0
@@ -131,7 +132,7 @@ class Params:
     # two springy floor strips anchored ahead of it, so a pull stretches them;
     # an adult lifts the crossbar's tab to take the drawer out.
     latch_hinge_w: float = 4.0
-    latch_t: float = 1.6  # the strips, thicker than the floor
+    latch_t: float = 2.4  # the strips: thick, so the crossbar's push is near their middle and stretches more than bends them
     latch_len: float = 50.0  # the strips, crossbar to anchor
     latch_bar: float = 9.0  # the crossbar, front to back: stiff between the strips
     latch_slit: float = 0.6
@@ -485,6 +486,17 @@ def stop_posts(p=P):
             out.append(yz_prism([(0, z0), (depth, z0), (depth - (z1 - z0), z1), (0, z1)], xa, xr + 0.1))
             # Beside the post, as deep as the post, so the edge the cam presses is braced
             out.append(yz_prism([(0, z0), (ys, z0), (ys - (z1 - z0), z1), (0, z1)], xa, xb))
+        # 45 degree gusset behind the post, from the ledge up its back edge
+        # under the cam: a pull on a locked drawer peaked in that corner. It
+        # fills the post's whole width, its 45 degree back included: a gusset
+        # only behind the post's back edge leaves a slot beside it that
+        # cracks at its root. Above it, the post's back goes from square
+        # back to 45 degrees over a slope rather than a step, whose corner
+        # was the next weak spot.
+        z0, g = drawer_z(i, p) - 0.1, min(4.0, c0 - 0.6 - drawer_z(i, p))
+        zt = z0 + g + 0.1
+        out.append(yz_prism([(0, z0), (ys + g, z0), (ys - 0.1, zt), (0, zt)], xa, xb))
+        out.append(loft([(xa, 0), (xb, 0), (xb, ys - 0.1), (xa, ys - 0.1)], zt - 0.1, [(xa, 0), (xb, 0), (xb, ys - (xb - xa)), (xa, ys)], zt + (xb - xa)))
     return out
 
 
@@ -513,6 +525,18 @@ def click_arm(p=P):
     tip = x + p.collar_r - p.det_press  # how far in the nub reaches
     nub = teardrop(p.nub_r, z0 + 2, z1 - 2, tip + p.nub_r, y).union(box(tip + p.nub_r, xa + 0.1, y - p.nub_r, y + p.nub_r, z0 + 2, z1 - 2))
     return [arm.union(base).union(nub)]
+
+
+def arm_relief(p=P):
+    """A shallow recess in the side wall behind the click's arm, so a thicker
+    arm still has room to bend. Its front end is 45 degrees, so it prints
+    with the frame on its back."""
+    x, y = rod_xy(p)
+    xr = inner_x(p)[1]
+    z0, z1 = collar_z(p)
+    ya, yb = y - p.nub_r - 0.5, y + p.arm_len
+    d = p.arm_relief
+    return prism([(xr - 0.1, ya - d - 0.1), (xr + d, ya), (xr + d, yb), (xr - 0.1, yb)], z0, z1)
 
 
 def latch_nubs(p=P):
@@ -584,6 +608,7 @@ def make_frame(p=P):
     body = shell(p).cut(box(xl, xr, -1, p.depth - p.back, p.cap, p.height - p.cap))
     for part in ledges(p) + latch_nubs(p) + stop_posts(p) + [unlock_stop(p)] + click_arm(p) + screw_bosses(p) + [floor_boss(p)]:
         body = body.union(part)
+    body = body.cut(arm_relief(p))  # on its own: cut_all mishandles overlapping cutters
     return cut_all(body, [top_slot(p), rod_socket(p)] + screw_holes(p) + decor(p) + bumpers(p))
 
 

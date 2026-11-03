@@ -132,6 +132,15 @@ General knowledge from books and guides lives in [`learnings/`](learnings/):
     real.
 - Before redesigning a part, find where its peak stress is. Fixes aimed at
   the wrong place cost several rounds.
+  - Rerun the check after every fix, and look again: a fix often moves the
+    peak to a new corner. In craft drawers, a gusset that met a post only
+    along one edge left a slot beside it, and the post broke at 28 N
+    instead of 62. Filled across the post's width, it held 115 N. Its flat
+    top made the next weak corner, and a slope fixed that.
+  - A load pushed on a ledge or rail above the middle of the strip under it
+    bends the strip as well as stretching it. Thicken the strip until its
+    middle is near the load's line. Craft drawers' latch went from 66 N to
+    117 N that way.
 - A linear model is enough for these checks:
   - Strength: the stress for a 1 N load scales to a breaking load.
   - Stiffness: displacement per newton gives the force for a required
@@ -143,6 +152,19 @@ General knowledge from books and guides lives in [`learnings/`](learnings/):
 - Memory: quadratic elements on large crops use a lot of it, and a full
   report can be stopped for lack of it. Crop tight round the part, and run
   checks one at a time: `uv run fea.py latch`.
+  - When a check takes many gigabytes, profile it before blaming the mesh.
+    In craft drawers, a 133k-element crop took 20 GB for two reasons, and
+    neither was its size:
+    - The multigrid tolerance (1e-10) was below what rounding allows. CG
+      reached 1e-8, drifted back up, failed the check and fell into a direct
+      solve, whose fill took 20 GB. Ask for the residual you accept.
+    - Leaving out the stresses near a load built a dense table of distances,
+      about 7 GB a time. A k-d tree does it in megabytes.
+  - Assembly of a 600k-unknown system still peaks near 7 GB. Cap a run's
+    memory with `systemd-run --user --scope -p MemoryMax=12G`, not
+    `ulimit -v`, which counts reserved address space and fails early.
+- gmsh's wheel needs `libglu1-mesa` and `libopengl0` on Linux, even with no
+  display.
 
 ## Working in this repo
 
