@@ -53,6 +53,11 @@ class CupParams:
     rail_d: float = 2.5  # how far the rails stand out from the rim's inside face
     rail_top: float = 1.0  # rails end this far below the rim
     cord_margin: float = 2.0  # keeps the cord slot on the flat of the back wall
+    # Sections (0 = left) with a cord opening each, for one charger's cord.
+    # Empty: one wide slot at the back right for all the cords.
+    cords: tuple = ()
+    cord_one_w: float = 8.0  # width of a one-cord opening
+    name: str = "cup"  # prefix of the part names and files
 
 
 C = CupParams()
@@ -104,14 +109,29 @@ def cord_x(c=C, p=P):
     return min((iw / 2 + stop_xs(c, p)[-1]) / 2, flat - p.cord_w / 2 - c.cord_margin)
 
 
+def cords(c=C, p=P):
+    """[(x, width)] of each cord opening in the back wall: the one wide slot,
+    or one per listed section, in its middle or as near as the flat of the
+    back wall allows."""
+    if not c.cords:
+        return [(cord_x(c, p), p.cord_w)]
+    iw, _ = inner(c, p)
+    flat = valley(NX, NY, p)[0] / 2 - so.corner(NX, NY, p) - c.cord_one_w / 2 - c.cord_margin
+    edges = [-iw / 2, *stop_xs(c, p), iw / 2]
+    return [(max(-flat, min(flat, (edges[i] + edges[i + 1]) / 2)), c.cord_one_w) for i in c.cords]
+
+
 def cord_slots(c=C, p=P):
-    """(sleeve cutter, tray cutter) for the cord slot in the back wall, as in
-    the grid organizer's electric cup."""
+    """[(sleeve cutter, tray cutter)] for each cord opening in the back wall,
+    as in the grid organizer's electric cup."""
     _, d = valley(NX, NY, p)
-    x, y_out = cord_x(c, p), d / 2 + p.rib_d + 1
-    top = gable(p.cord_w, p.pad_z - 1, p.cord_z, d / 2 - spigot_off(p) - p.wall - 1, y_out, x)
-    tray = box(x - p.cord_w / 2, x + p.cord_w / 2, d / 2 - p.wall - 1, y_out, p.floor_z, p.seat_z + 1)
-    return top, tray
+    y_out = d / 2 + p.rib_d + 1
+    out = []
+    for x, cw in cords(c, p):
+        top = gable(cw, p.pad_z - 1, p.cord_z, d / 2 - spigot_off(p) - p.wall - 1, y_out, x)
+        tray = box(x - cw / 2, x + cw / 2, d / 2 - p.wall - 1, y_out, p.floor_z, p.seat_z + 1)
+        out.append((top, tray))
+    return out
 
 
 def make_tray(c=C, p=P):
@@ -123,7 +143,10 @@ def make_tray(c=C, p=P):
     cavity = rprism(w - 2 * p.wall, d - 2 * p.wall, so.corner(NX, NY, p) - p.wall, p.floor_z, rim + 1)
     tray = outer.cut(cavity).cut(seat_cone(NX, NY, p.seat_z, 8, p))
     g = groove(w / 2 - p.wall, p.top_latch_z, p.top_latch_proud, p.top_latch_w / 2 + 1.5, p)
-    return tray.cut(g).cut(g.rotate((0, 0, 0), (0, 0, 1), 180)).cut(cord_slots(c, p)[1])
+    tray = tray.cut(g).cut(g.rotate((0, 0, 0), (0, 0, 1), 180))
+    for _, cut in cord_slots(c, p):
+        tray = tray.cut(cut)
+    return tray
 
 
 def reeded_wire(w, d, r, n, depth, z):
@@ -231,9 +254,11 @@ def make_sleeve(c=C, p=P):
     vents = [
         gable(p.vent_w, p.vent_z, p.vent_z + p.vent_h, d / 2 - p.wall - 1, d / 2 + p.rib_d + 1, u)
         for u in so.vent_positions(NX, NY, 0, p)
-        if abs(u - cord_x(c, p)) >= p.cord_w / 2 + p.vent_w
+        if all(abs(u - x) >= cw / 2 + p.vent_w for x, cw in cords(c, p))
     ]
-    sleeve = so.cut_all(sleeve, vents).cut(cord_slots(c, p)[0])
+    sleeve = so.cut_all(sleeve, vents)
+    for cut, _ in cord_slots(c, p):
+        sleeve = sleeve.cut(cut)
     for x in stop_xs(c, p):
         rail = rails(x, c, p)
         sleeve = sleeve.union(rail).union(rail.mirror("XZ"))
@@ -257,29 +282,31 @@ def tray_overhangs(c=C, p=P):
 
 def make_parts(c=C, p=P):
     """Part name -> solid, in assembled position."""
-    return {"cup_tray": make_tray(c, p), "cup_sleeve": make_sleeve(c, p), "cup_separator": make_separator(c, p)}
+    n = c.name
+    return {f"{n}_tray": make_tray(c, p), f"{n}_sleeve": make_sleeve(c, p), f"{n}_separator": make_separator(c, p)}
 
 
 def assembled(parts, c=C, p=P):
     """Name -> solid for the whole cup, with a separator in every place."""
-    out = {"cup_tray": parts["cup_tray"], "cup_sleeve": parts["cup_sleeve"]}
+    n = c.name
+    out = {f"{n}_tray": parts[f"{n}_tray"], f"{n}_sleeve": parts[f"{n}_sleeve"]}
     x0 = stop_xs(c, p)[0]
     for i, x in enumerate(stop_xs(c, p)):
-        out[f"cup_separator_{i + 1}"] = parts["cup_separator"].translate((x - x0, 0, 0))
+        out[f"{n}_separator_{i + 1}"] = parts[f"{n}_separator"].translate((x - x0, 0, 0))
     return out
 
 
 def print_pose(name, part):
     """Separators print lying flat; the rest stand as modelled."""
-    if name == "cup_separator":
+    if name.endswith("_separator"):
         part = part.rotate((0, 0, 0), (0, 1, 0), 90)
     return so.on_bed(part)
 
 
-def main(out=Path(__file__).parent / "out"):
+def main(out=Path(__file__).parent / "out", c=C):
     out.mkdir(exist_ok=True)
-    parts = make_parts()
-    for name, part in assembled(parts).items():
+    parts = make_parts(c)
+    for name, part in assembled(parts, c).items():
         cq.exporters.export(part, str(out / f"assembled.{name}.stl"), tolerance=0.02, angularTolerance=0.2)
     for name, part in parts.items():
         part = print_pose(name, part)

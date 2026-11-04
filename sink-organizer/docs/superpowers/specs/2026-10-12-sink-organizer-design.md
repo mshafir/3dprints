@@ -1,5 +1,27 @@
 # Sink organizer design
 
+## Revision 11 (2026-11-03): single cup for four electric toothbrushes
+
+A second version of the single cup, in `sink_cup4.py` (tests in
+`tests/test_sink_cup4.py`, Studio project `out/sink_cup4.3mf`). The first
+single cup is unchanged.
+
+- What the user asked for: four electric toothbrushes on their chargers
+  across the cup, which they fill almost exactly, so three separators
+  instead of five and no toothpaste section. One opening in the back wall
+  per toothbrush cord. The user's chargers are smaller than the Oral-B ones
+  in this spec and fit on the floor under the separators.
+- The same sleeve, tray, flutes, latch and separators. The three separators
+  divide the inside into four even sections, 35.6 mm each.
+- Each cord opening is the old cord slot's shape, 8 mm wide instead of
+  14 (one cord each), in the middle of its section, through the sleeve and
+  the tray, open at the bottom so the sleeve lowers over cords already in
+  place. The vents next to them are left out.
+- My call: 8 mm per opening (`cord_one_w`).
+- The tray is new: the printed single-cup tray has only its one wide slot.
+- Bambu Studio: tray 41.5 g, 56 min; sleeve 175.5 g, 6 h 29 min; three
+  separators 24.2 g, 37 min. No warnings.
+
 ## Revision 10 (2026-11-03): fits 7 inches of counter
 
 - The holder has to fit 7 in (177.8 mm) of counter; it was 186.5 mm.

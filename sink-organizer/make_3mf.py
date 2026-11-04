@@ -2,9 +2,10 @@
 settings and colours already chosen.
 
 Run `uv run make_3mf.py` from this folder after `sink_organizer.py`,
-`sink_cup.py` and `jar_holder.py` have written out/. It drives Bambu Studio from the command line,
+`sink_cup.py`, `sink_cup4.py` and `jar_holder.py` have written out/. It drives Bambu Studio from the command line,
 so the projects are written by Studio itself: out/sink_organizer.3mf for the
-grid organizer, out/sink_cup.3mf for the single wide cup and
+grid organizer, out/sink_cup.3mf for the single wide cup,
+out/sink_cup4.3mf for its four-toothbrush version and
 out/jar_holder.3mf for the mason jar holder. Each has one
 plate per group of parts, all in one filament, and a last plate that shows
 them all assembled.
@@ -86,6 +87,18 @@ CUP_PLATES[ASSEMBLED] = [
     + [(f"assembled.cup_separator_{i}", GREY) for i in range(1, 6)]
 ]
 
+# The single cup for four electric toothbrushes (sink_cup4.py): three
+# separators, all printed
+CUP4_PLATES = {
+    "Tray": [[("cup4_tray", GREY)]],
+    "Sleeve": [[("cup4_sleeve", GREY)]],
+    "Separators": [[("cup4_separator", GREY)]] * 3,
+    ASSEMBLED: [
+        [(f"assembled.{stl}", GREY) for stl in ("cup4_tray", "cup4_sleeve")]
+        + [(f"assembled.cup4_separator_{i}", GREY) for i in range(1, 4)]
+    ],
+}
+
 # The mason jar holder (jar_holder.py): the test ring first, to check the
 # jar's size before the holder
 JAR_PLATES = {
@@ -94,7 +107,7 @@ JAR_PLATES = {
     ASSEMBLED: [[(f"assembled.{stl}", GREY) for stl in ("jar_holder", "jar_1", "jar_2")]],
 }
 
-PROJECTS = {"sink_organizer.3mf": PLATES, "sink_cup.3mf": CUP_PLATES, "jar_holder.3mf": JAR_PLATES}
+PROJECTS = {"sink_organizer.3mf": PLATES, "sink_cup.3mf": CUP_PLATES, "sink_cup4.3mf": CUP4_PLATES, "jar_holder.3mf": JAR_PLATES}
 
 NOT_SETTINGS = ("name", "type", "instantiation", "inherits", "include")
 
